@@ -1,43 +1,90 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Plus, 
-  Trash2, 
-  CreditCard, 
-  Wallet, 
-  Briefcase, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Plus,
+  Trash2,
+  CreditCard,
+  Wallet,
+  Briefcase,
   Tag,
-  ChevronRight
+  ChevronRight,
+  X
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
+import { useApi } from '@/src/hooks/useApi';
 
 export default function Settings() {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [modalType, setModalType] = useState<'accounts' | 'categories'>('accounts');
+  const [formData, setFormData] = useState({ name: '', type: 'bank', balance: '0' });
 
-  useEffect(() => {
+  const { fetchWithAuth } = useApi();
+
+  const fetchData = useCallback(() => {
     Promise.all([
-      fetch('/api/accounts').then(res => res.json()),
-      fetch('/api/categories').then(res => res.json())
+      fetchWithAuth('/api/accounts').then(res => res.json()),
+      fetchWithAuth('/api/categories').then(res => res.json())
     ]).then(([accs, cats]) => {
       setAccounts(accs);
       setCategories(cats);
       setLoading(false);
-    });
-  }, []);
+    }).catch(console.error);
+  }, [fetchWithAuth]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleAddNew = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const isAccount = modalType === 'accounts';
+    const endpoint = isAccount ? '/api/accounts' : '/api/categories';
+
+    const payload = isAccount ? {
+      id: 'acc-' + Math.random().toString(36).substr(2, 9),
+      name: formData.name,
+      type: formData.type || 'bank',
+      balance: parseFloat(formData.balance || '0'),
+      icon: 'Wallet',
+      color: '#3b82f6'
+    } : {
+      id: 'cat-' + Math.random().toString(36).substr(2, 9),
+      name: formData.name,
+      type: formData.type || 'expense',
+      icon: 'Tag',
+      color: '#8b5cf6'
+    };
+
+    try {
+      const res = await fetchWithAuth(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        setShowAddModal(false);
+        setFormData({ name: '', type: 'bank', balance: '0' });
+        fetchData();
+      }
+    } catch (error) {
+      console.error('Failed to add item', error);
+    }
+  };
 
   const sections = [
-    { 
-      id: 'accounts', 
-      title: 'Accounts & Assets', 
+    {
+      id: 'accounts',
+      title: 'Accounts & Assets',
       description: 'Manage your bank accounts, cash, and investment assets.',
       items: accounts,
       icon: CreditCard,
       type: 'account'
     },
-    { 
-      id: 'categories', 
-      title: 'Categories', 
+    {
+      id: 'categories',
+      title: 'Categories',
       description: 'Configure income and expense categories for tracking.',
       items: categories,
       icon: Tag,
@@ -62,7 +109,13 @@ export default function Settings() {
                 <h3 className="text-lg lg:text-xl font-bold text-white">{section.title}</h3>
                 <p className="text-zinc-500 text-xs lg:text-sm mt-1">{section.description}</p>
               </div>
-              <button className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all text-xs font-bold uppercase tracking-widest">
+              <button
+                onClick={() => {
+                  setModalType(section.id as 'accounts' | 'categories');
+                  setFormData({ name: '', type: section.id === 'accounts' ? 'bank' : 'expense', balance: '0' });
+                  setShowAddModal(true);
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all text-xs font-bold uppercase tracking-widest">
                 <Plus className="w-4 h-4" />
                 Add New
               </button>
@@ -128,6 +181,75 @@ export default function Settings() {
           </div>
         </div>
       </div>
+
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#151518] rounded-[32px] border border-white/10 p-6 lg:p-8 w-full max-w-md relative">
+            <button
+              onClick={() => setShowAddModal(false)}
+              className="absolute top-6 right-6 p-2 rounded-full hover:bg-white/10 text-zinc-500 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-xl lg:text-2xl font-bold text-white mb-6">
+              Add New {modalType === 'accounts' ? 'Account' : 'Category'}
+            </h2>
+            <form onSubmit={handleAddNew} className="space-y-4">
+              <div>
+                <label className="block text-white text-sm font-bold mb-2">Name</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-white text-sm font-bold mb-2">Type</label>
+                <select
+                  value={formData.type}
+                  onChange={e => setFormData({ ...formData, type: e.target.value })}
+                  className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                >
+                  {modalType === 'accounts' ? (
+                    <>
+                      <option value="bank">Bank</option>
+                      <option value="cash">Cash</option>
+                      <option value="asset">Asset / Investment</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="income">Income</option>
+                      <option value="expense">Expense</option>
+                    </>
+                  )}
+                </select>
+              </div>
+              {modalType === 'accounts' && (
+                <div>
+                  <label className="block text-white text-sm font-bold mb-2">Initial Balance</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.balance}
+                    onChange={e => setFormData({ ...formData, balance: e.target.value })}
+                    className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                    required
+                  />
+                </div>
+              )}
+              <button
+                type="submit"
+                className="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-all shadow-lg shadow-emerald-500/20 mt-4"
+              >
+                Create
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

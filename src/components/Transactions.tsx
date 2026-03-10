@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  ArrowUpRight, 
-  ArrowDownRight, 
-  ArrowLeftRight, 
-  Search, 
+import {
+  ArrowUpRight,
+  ArrowDownRight,
+  ArrowLeftRight,
+  Search,
   Filter,
   Plus,
   MoreVertical,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { useApi } from '@/src/hooks/useApi';
 
 import SmartTransactionInput from '@/src/components/SmartTransactionInput';
 
@@ -36,17 +37,20 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
 
+  const { fetchWithAuth } = useApi();
+
   const fetchTransactions = () => {
-    fetch('/api/transactions')
+    fetchWithAuth('/api/transactions')
       .then(res => res.json())
-      .then(setTransactions);
+      .then(setTransactions)
+      .catch(console.error);
   };
 
   useEffect(() => {
     fetchTransactions();
-    fetch('/api/accounts').then(res => res.json()).then(setAccounts);
-    fetch('/api/categories').then(res => res.json()).then(setCategories);
-  }, []);
+    fetchWithAuth('/api/accounts').then(res => res.json()).then(setAccounts).catch(console.error);
+    fetchWithAuth('/api/categories').then(res => res.json()).then(setCategories).catch(console.error);
+  }, [fetchWithAuth]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,23 +61,26 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
       amount: parseFloat(formData.amount)
     };
 
-    const res = await fetch('/api/transactions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (res.ok) {
-      setShowAddModal(false);
-      fetchTransactions();
-      setFormData({
-        amount: '',
-        date: new Date().toISOString().slice(0, 16),
-        note: '',
-        category_id: '',
-        from_account_id: '',
-        to_account_id: ''
+    try {
+      const res = await fetchWithAuth('/api/transactions', {
+        method: 'POST',
+        body: JSON.stringify(payload)
       });
+
+      if (res.ok) {
+        setShowAddModal(false);
+        fetchTransactions();
+        setFormData({
+          amount: '',
+          date: new Date().toISOString().slice(0, 16),
+          note: '',
+          category_id: '',
+          from_account_id: '',
+          to_account_id: ''
+        });
+      }
+    } catch (error) {
+      console.error('Failed to submit transaction', error);
     }
   };
 
@@ -84,14 +91,17 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
       amount: parseFloat(data.amount)
     };
 
-    const res = await fetch('/api/transactions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    try {
+      const res = await fetchWithAuth('/api/transactions', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
 
-    if (res.ok) {
-      fetchTransactions();
+      if (res.ok) {
+        fetchTransactions();
+      }
+    } catch (error) {
+      console.error('Failed to submit smart transaction', error);
     }
   };
 
@@ -126,7 +136,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
           <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">Transactions</h1>
           <p className="text-zinc-500 mt-1 text-sm lg:text-base">Manage and track every movement of your wealth.</p>
         </div>
-        <button 
+        <button
           onClick={() => handleSmartEdit('expense')}
           className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 text-sm lg:text-base"
         >
@@ -136,7 +146,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
       </div>
 
       {/* Smart Input Area */}
-      <SmartTransactionInput 
+      <SmartTransactionInput
         accounts={accounts}
         categories={categories}
         transactions={transactions}
@@ -150,8 +160,8 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
         <div className="flex flex-col md:flex-row gap-3 justify-between items-center">
           <div className="relative w-full md:w-96">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder="Search transactions..."
               className="w-full bg-[#151518] border border-white/5 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm"
             />
@@ -200,13 +210,13 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                         <div className="flex items-center gap-4">
                           <div className={cn(
                             "w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110",
-                            t.type === 'income' ? "bg-emerald-400/10 text-emerald-400" : 
-                            t.type === 'expense' ? "bg-red-400/10 text-red-400" : 
-                            "bg-blue-400/10 text-blue-400"
+                            t.type === 'income' ? "bg-emerald-400/10 text-emerald-400" :
+                              t.type === 'expense' ? "bg-red-400/10 text-red-400" :
+                                "bg-blue-400/10 text-blue-400"
                           )}>
-                            {t.type === 'income' ? <ArrowUpRight className="w-5 h-5" /> : 
-                             t.type === 'expense' ? <ArrowDownRight className="w-5 h-5" /> : 
-                             <ArrowLeftRight className="w-5 h-5" />}
+                            {t.type === 'income' ? <ArrowUpRight className="w-5 h-5" /> :
+                              t.type === 'expense' ? <ArrowDownRight className="w-5 h-5" /> :
+                                <ArrowLeftRight className="w-5 h-5" />}
                           </div>
                           <div>
                             <p className="text-white font-bold text-sm">{t.note || 'No description'}</p>
@@ -229,9 +239,9 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                       <td className="px-8 py-6">
                         <p className={cn(
                           "font-bold text-lg tracking-tight",
-                          t.type === 'income' ? "text-emerald-400" : 
-                          t.type === 'expense' ? "text-red-400" : 
-                          "text-blue-400"
+                          t.type === 'income' ? "text-emerald-400" :
+                            t.type === 'expense' ? "text-red-400" :
+                              "text-blue-400"
                         )}>
                           {t.type === 'expense' ? '-' : t.type === 'income' ? '+' : ''}
                           {formatCurrency(t.amount)}
@@ -261,13 +271,13 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                   <div className="flex items-center gap-4">
                     <div className={cn(
                       "w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg",
-                      t.type === 'income' ? "bg-emerald-400/10 text-emerald-400 shadow-emerald-500/5" : 
-                      t.type === 'expense' ? "bg-red-400/10 text-red-400 shadow-red-500/5" : 
-                      "bg-blue-400/10 text-blue-400 shadow-blue-500/5"
+                      t.type === 'income' ? "bg-emerald-400/10 text-emerald-400 shadow-emerald-500/5" :
+                        t.type === 'expense' ? "bg-red-400/10 text-red-400 shadow-red-500/5" :
+                          "bg-blue-400/10 text-blue-400 shadow-blue-500/5"
                     )}>
-                      {t.type === 'income' ? <ArrowUpRight className="w-6 h-6" /> : 
-                       t.type === 'expense' ? <ArrowDownRight className="w-6 h-6" /> : 
-                       <ArrowLeftRight className="w-6 h-6" />}
+                      {t.type === 'income' ? <ArrowUpRight className="w-6 h-6" /> :
+                        t.type === 'expense' ? <ArrowDownRight className="w-6 h-6" /> :
+                          <ArrowLeftRight className="w-6 h-6" />}
                     </div>
                     <div>
                       <p className="text-white font-bold text-sm leading-tight">{t.note || 'No description'}</p>
@@ -284,9 +294,9 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                   <div className="text-right">
                     <p className={cn(
                       "font-bold text-base tracking-tight",
-                      t.type === 'income' ? "text-emerald-400" : 
-                      t.type === 'expense' ? "text-red-400" : 
-                      "text-blue-400"
+                      t.type === 'income' ? "text-emerald-400" :
+                        t.type === 'expense' ? "text-red-400" :
+                          "text-blue-400"
                     )}>
                       {t.type === 'expense' ? '-' : t.type === 'income' ? '+' : ''}
                       {formatCurrency(t.amount)}
@@ -306,14 +316,14 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
       <AnimatePresence>
         {showAddModal && (
           <div className="fixed inset-0 z-[100] flex items-end lg:items-center justify-center p-0 lg:p-6">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowAddModal(false)}
               className="absolute inset-0 bg-black/80 backdrop-blur-md"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 100 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 100 }}
@@ -325,7 +335,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                     <h2 className="text-2xl font-bold text-white capitalize">Record {activeType}</h2>
                     <p className="text-zinc-500 mt-1 text-sm">Fill in the details below.</p>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setShowAddModal(false)}
                     className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white"
                   >
@@ -340,9 +350,9 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                     <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-1">Amount</label>
                     <div className="relative">
                       <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                      <input 
+                      <input
                         required
-                        type="number" 
+                        type="number"
                         step="0.01"
                         value={formData.amount}
                         onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
@@ -353,9 +363,9 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                   </div>
                   <div className="space-y-3">
                     <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-1">Date</label>
-                    <input 
+                    <input
                       required
-                      type="datetime-local" 
+                      type="datetime-local"
                       value={formData.date}
                       onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                       className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm"
@@ -367,7 +377,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                   <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-1">
                     {activeType === 'income' ? 'To Account' : activeType === 'expense' ? 'From Account' : 'From Account'}
                   </label>
-                  <select 
+                  <select
                     required
                     value={formData.from_account_id}
                     onChange={(e) => setFormData({ ...formData, from_account_id: e.target.value })}
@@ -383,7 +393,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                 {activeType === 'transfer' && (
                   <div className="space-y-3">
                     <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-1">To Account</label>
-                    <select 
+                    <select
                       required
                       value={formData.to_account_id}
                       onChange={(e) => setFormData({ ...formData, to_account_id: e.target.value })}
@@ -400,7 +410,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                 {activeType !== 'transfer' && (
                   <div className="space-y-3">
                     <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-1">Category</label>
-                    <select 
+                    <select
                       required
                       value={formData.category_id}
                       onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
@@ -416,7 +426,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
 
                 <div className="space-y-3">
                   <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-1">Note</label>
-                  <textarea 
+                  <textarea
                     value={formData.note}
                     onChange={(e) => setFormData({ ...formData, note: e.target.value })}
                     placeholder="What was this for?"
@@ -425,14 +435,14 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4 pt-4 pb-8 lg:pb-0">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setShowAddModal(false)}
                     className="order-2 sm:order-1 flex-1 px-6 py-5 rounded-2xl border border-white/5 text-zinc-400 font-bold hover:bg-white/5 transition-all text-sm uppercase tracking-widest"
                   >
                     Cancel
                   </button>
-                  <button 
+                  <button
                     type="submit"
                     className="order-1 sm:order-2 flex-1 px-6 py-5 rounded-2xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20 text-sm uppercase tracking-widest"
                   >
