@@ -308,4 +308,45 @@ app.get(["/api/dashboard", "/dashboard"], async (req, res) => {
   });
 });
 
+app.get(["/api/dashboard/history", "/dashboard/history"], async (req, res) => {
+  const userId = (req as any).user.id;
+  const months = Math.min(parseInt(req.query.months as string || '12'), 24);
+
+  const { data: accounts } = await supabase.from('accounts').select('balance').eq('user_id', userId);
+  const currentNetWorth = (accounts || []).reduce((s: number, a: any) => s + Number(a.balance), 0);
+
+  const { data: allTx } = await supabase
+    .from('transactions')
+    .select('amount,type,date')
+    .eq('user_id', userId)
+    .order('date', { ascending: false });
+
+  // Build map of monthly aggregates
+  const monthMap: Record<string, { income: number; expense: number }> = {};
+  for (const t of (allTx || [])) {
+    const key = t.date.slice(0, 7); // YYYY-MM
+    if (!monthMap[key]) monthMap[key] = { income: 0, expense: 0 };
+    if (t.type === 'income') monthMap[key].income += Number(t.amount);
+    if (t.type === 'expense') monthMap[key].expense += Number(t.amount);
+  }
+
+  // Walk backwards from current net worth to reconstruct historical net worth
+  const result = [];
+  let runningNW = currentNetWorth;
+  const now = new Date();
+
+  for (let i = 0; i < months; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+    const { income = 0, expense = 0 } = monthMap[key] || {};
+    const savings = income - expense;
+    result.push({ month: key, label, income, expense, savings, netWorth: runningNW });
+    // Going backwards: subtract the net effect of this month to get prior month end
+    runningNW -= savings;
+  }
+
+  res.json(result.reverse());
+});
+
 export default app;

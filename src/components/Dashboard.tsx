@@ -25,6 +25,12 @@ import {
 import { formatCurrency, cn } from '@/src/lib/utils';
 import { motion } from 'motion/react';
 import { useApi } from '@/src/hooks/useApi';
+import InsightCards from './InsightCards';
+import HealthScoreCard from './HealthScoreCard';
+import ForecastSection from './ForecastSection';
+import { generateInsights } from '@/src/lib/insightsEngine';
+import { computeForecast } from '@/src/lib/forecastEngine';
+import { computeHealthScore } from '@/src/lib/healthScoreEngine';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -38,12 +44,21 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
   const [chartRange, setChartRange] = useState<number>(6);
   const { fetchWithAuth } = useApi();
 
+  const [history, setHistory] = useState<any[]>([]);
+
   useEffect(() => {
     fetchWithAuth(`/api/dashboard?month=${selectedMonth}`)
       .then(res => res.json())
       .then(setData)
       .catch(console.error);
   }, [selectedMonth, fetchWithAuth]);
+
+  useEffect(() => {
+    fetchWithAuth('/api/dashboard/history?months=12')
+      .then(res => res.json())
+      .then(setHistory)
+      .catch(console.error);
+  }, [fetchWithAuth]);
 
   if (!data) return <div className="p-8 text-zinc-500">Loading dashboard...</div>;
 
@@ -82,18 +97,9 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
     name: a.name, value: a.balance
   }));
 
-  const insights = [];
-  if (data.savingsRate >= 20) {
-    insights.push({ title: 'Excellent Savings Rate', text: `Your savings rate of ${data.savingsRate.toFixed(1)}% is above the recommended 20%.`, color: 'emerald', icon: TrendingUp });
-  } else if (data.savingsRate > 0) {
-    insights.push({ title: 'Healthy Savings', text: `Your savings rate is ${data.savingsRate.toFixed(1)}%. Keep it up!`, color: 'emerald', icon: TrendingUp });
-  }
-  if (data.monthlyExpense > data.monthlyIncome && data.monthlyIncome > 0) {
-    insights.push({ title: 'Overspending Alert', text: 'Your expenses exceeded your income this month.', color: 'amber', icon: TrendingDown });
-  }
-  if (insights.length === 0) {
-    insights.push({ title: 'Waiting for Data', text: 'Add more transactions to unlock smart financial insights.', color: 'blue', icon: TrendingUp });
-  }
+  const smartInsights = generateInsights(history);
+  const forecast = history.length >= 2 ? computeForecast(history) : null;
+  const healthScore = computeHealthScore(history, data.accounts || []);
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12 lg:pb-0">
@@ -333,36 +339,28 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
         </div>
 
         <div className="bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8">
-          <h3 className="text-lg lg:text-xl font-bold text-white mb-8">Smart Insights</h3>
-          <div className="space-y-4">
-            {insights.map((insight, i) => (
-              <div key={i} className={cn(
-                "p-5 rounded-2xl border flex gap-4 transition-all hover:scale-[1.02]",
-                insight.color === 'emerald' ? "bg-emerald-400/5 border-emerald-400/10" :
-                  insight.color === 'amber' ? "bg-amber-400/5 border-amber-400/10" :
-                    "bg-blue-400/5 border-blue-400/10"
-              )}>
-                <div className={cn(
-                  "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
-                  insight.color === 'emerald' ? "bg-emerald-400/10 text-emerald-400" :
-                    insight.color === 'amber' ? "bg-amber-400/10 text-amber-400" :
-                      "bg-blue-400/10 text-blue-400"
-                )}>
-                  <insight.icon className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className={cn(
-                    "font-bold text-sm",
-                    insight.color === 'emerald' ? "text-emerald-400" :
-                      insight.color === 'amber' ? "text-amber-400" :
-                        "text-blue-400"
-                  )}>{insight.title}</h4>
-                  <p className="text-zinc-400 text-xs mt-1 leading-relaxed">{insight.text}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <h3 className="text-lg lg:text-xl font-bold text-white mb-6">Smart Insights</h3>
+          <InsightCards insights={smartInsights} maxShow={3} />
         </div>
+      </div>
+
+      {/* Health Score + Forecast Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+        <HealthScoreCard score={healthScore} compact />
+
+        {forecast ? (
+          <div className="bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg lg:text-xl font-bold text-white">Net Worth Forecast</h3>
+              <span className="text-xs text-zinc-500 font-bold uppercase tracking-widest">Projection</span>
+            </div>
+            <ForecastSection forecast={forecast} history={history} compact />
+          </div>
+        ) : (
+          <div className="bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8 flex items-center justify-center">
+            <p className="text-zinc-600 text-sm text-center">Add more transactions across multiple months to enable forecasting.</p>
+          </div>
+        )}
       </div>
     </div>
   );
