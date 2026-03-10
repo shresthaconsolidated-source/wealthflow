@@ -10,7 +10,10 @@ import {
   Calendar,
   Tag,
   CreditCard,
-  DollarSign
+  DollarSign,
+  Edit2,
+  Trash2,
+  X
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -36,6 +39,8 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
   });
   const [accounts, setAccounts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const { fetchWithAuth } = useApi();
 
@@ -56,19 +61,22 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
     e.preventDefault();
     const payload = {
       ...formData,
-      id: Math.random().toString(36).substr(2, 9),
+      id: editingId || Math.random().toString(36).substr(2, 9),
       type: activeType,
       amount: parseFloat(formData.amount)
     };
 
     try {
-      const res = await fetchWithAuth('/api/transactions', {
-        method: 'POST',
+      const method = editingId ? 'PUT' : 'POST';
+      const url = editingId ? `/api/transactions/${editingId}` : '/api/transactions';
+      const res = await fetchWithAuth(url, {
+        method,
         body: JSON.stringify(payload)
       });
 
       if (res.ok) {
         setShowAddModal(false);
+        setEditingId(null);
         fetchTransactions();
         setFormData({
           amount: '',
@@ -127,6 +135,32 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
       });
     }
     setShowAddModal(true);
+  };
+
+  // Pre-fill form from an existing transaction and open modal for editing
+  const handleEditTransaction = (t: any) => {
+    setEditingId(t.id);
+    setActiveType(t.type);
+    setFormData({
+      amount: t.amount?.toString() || '',
+      date: t.date ? t.date.slice(0, 16) : new Date().toISOString().slice(0, 16),
+      note: t.note || '',
+      category_id: t.category_id || '',
+      from_account_id: t.from_account_id || '',
+      to_account_id: t.to_account_id || '',
+    });
+    setOpenMenuId(null);
+    setShowAddModal(true);
+  };
+
+  const handleDeleteTransaction = async (id: string) => {
+    setOpenMenuId(null);
+    try {
+      await fetchWithAuth(`/api/transactions/${id}`, { method: 'DELETE' });
+      fetchTransactions();
+    } catch (err) {
+      console.error('Delete failed', err);
+    }
   };
 
   return (
@@ -300,9 +334,32 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                       {t.type === 'expense' ? '-' : t.type === 'income' ? '+' : ''}
                       {formatCurrency(t.amount)}
                     </p>
-                    <button className="p-2 -mr-2 text-zinc-600">
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
+                    <div className="relative">
+                      <button
+                        onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
+                        className="p-2 -mr-2 text-zinc-600 hover:text-white rounded-lg hover:bg-white/5 transition-all"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                      {openMenuId === t.id && (
+                        <div className="absolute right-0 top-8 z-50 bg-[#1a1a1f] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[140px]">
+                          <button
+                            onClick={() => handleEditTransaction(t)}
+                            className="flex items-center gap-3 w-full px-4 py-3 text-sm text-zinc-300 hover:text-white hover:bg-white/5 transition-all"
+                          >
+                            <Edit2 className="w-4 h-4 text-blue-400" />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTransaction(t.id)}
+                            className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/5 transition-all border-t border-white/5"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))

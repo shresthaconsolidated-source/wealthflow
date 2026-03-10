@@ -268,6 +268,67 @@ app.post(["/api/transactions", "/transactions"], async (req, res) => {
   res.json({ success: true });
 });
 
+// UPDATE transaction (delete old, insert new to keep balances accurate)
+app.put(["/api/transactions/:id", "/transactions/:id"], async (req, res) => {
+  const userId = (req as any).user.id;
+  const transactionId = req.params.id;
+  let { from_account_id, to_account_id, category_id, amount, type, date, note } = req.body;
+
+  if (!to_account_id) to_account_id = null;
+  if (!category_id) category_id = null;
+
+  // Fetch old transaction so we can reverse its balance effect
+  const { data: old } = await supabase
+    .from('transactions').select('*').eq('id', transactionId).eq('user_id', userId).single();
+
+  if (!old) return res.status(404).json({ error: 'Transaction not found' });
+
+  // Reverse old balance effect
+  try {
+    if (old.type === 'income' && old.to_account_id) {
+      const { data: acc } = await supabase.from('accounts').select('balance').eq('id', old.to_account_id).single();
+      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - Number(old.amount) }).eq('id', old.to_account_id);
+    } else if (old.type === 'expense' && old.from_account_id) {
+      const { data: acc } = await supabase.from('accounts').select('balance').eq('id', old.from_account_id).single();
+      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + Number(old.amount) }).eq('id', old.from_account_id);
+    } else if (old.type === 'transfer') {
+      if (old.from_account_id) {
+        const { data: acc } = await supabase.from('accounts').select('balance').eq('id', old.from_account_id).single();
+        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + Number(old.amount) }).eq('id', old.from_account_id);
+      }
+      if (old.to_account_id) {
+        const { data: acc } = await supabase.from('accounts').select('balance').eq('id', old.to_account_id).single();
+        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - Number(old.amount) }).eq('id', old.to_account_id);
+      }
+    }
+  } catch (e) { console.error('Error reversing balance', e); }
+
+  // Update the transaction record
+  const { error } = await supabase.from('transactions').update({
+    from_account_id, to_account_id, category_id, amount, type, date, note
+  }).eq('id', transactionId).eq('user_id', userId);
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Apply new balance effect
+  try {
+    if (type === 'income' && to_account_id) {
+      const { data: acc } = await supabase.from('accounts').select('balance').eq('id', to_account_id).single();
+      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + Number(amount) }).eq('id', to_account_id);
+    } else if (type === 'expense' && from_account_id) {
+      const { data: acc } = await supabase.from('accounts').select('balance').eq('id', from_account_id).single();
+      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - Number(amount) }).eq('id', from_account_id);
+    } else if (type === 'transfer' && from_account_id && to_account_id) {
+      const { data: fromAcc } = await supabase.from('accounts').select('balance').eq('id', from_account_id).single();
+      if (fromAcc) await supabase.from('accounts').update({ balance: Number(fromAcc.balance) - Number(amount) }).eq('id', from_account_id);
+      const { data: toAcc } = await supabase.from('accounts').select('balance').eq('id', to_account_id).single();
+      if (toAcc) await supabase.from('accounts').update({ balance: Number(toAcc.balance) + Number(amount) }).eq('id', to_account_id);
+    }
+  } catch (e) { console.error('Error applying new balance', e); }
+
+  res.json({ success: true });
+});
+
 app.delete(["/api/transactions/:id", "/transactions/:id"], async (req, res) => {
   const userId = (req as any).user.id;
   const transactionId = req.params.id;
