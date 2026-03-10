@@ -13,7 +13,7 @@ import MobileBottomNav from '@/src/components/MobileBottomNav';
 import MobileHeader from '@/src/components/MobileHeader';
 import FAB from '@/src/components/FAB';
 
-const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '631803362356-e9sld8untk9kh2hpgca6em5m3dpvngr3.apps.googleusercontent.com';
 
 export default function App() {
   const { user, loading, login } = useAuth();
