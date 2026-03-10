@@ -21,10 +21,12 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
 const app = express();
 app.use(express.json());
 
-// STRICT Middleware to authenticate requests via JWT
+// Middleware to authenticate /api requests via JWT (skipping auth endpoints)
 app.use((req, res, next) => {
-  // Skip auth for Vercel rewriting or local
-  if (req.path === '/api/auth/google' || req.path === '/auth/google') {
+  const isApiRoute = req.path.startsWith('/api/') || req.path.startsWith('/auth/');
+  const isAuthRoute = req.path === '/api/auth/google' || req.path === '/auth/google';
+
+  if (!isApiRoute || isAuthRoute) {
     return next();
   }
 
@@ -36,7 +38,7 @@ app.use((req, res, next) => {
       (req as any).user = decoded;
       return next();
     } catch (err) {
-      // Token invalid, fall through to 401
+      // Token invalid
     }
   }
 

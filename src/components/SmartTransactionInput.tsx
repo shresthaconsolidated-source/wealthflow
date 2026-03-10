@@ -1,61 +1,59 @@
 import React from 'react';
-import { 
-  ArrowUpRight, 
-  ArrowDownRight, 
-  ArrowLeftRight, 
+import {
+  ArrowUpRight,
+  ArrowDownRight,
+  ArrowLeftRight,
   Plus,
-  Wallet,
-  Sparkles
+  Wallet
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 
 interface SmartTransactionInputProps {
   accounts: any[];
   categories: any[];
-  transactions: any[];
   onConfirm: (transaction: any) => Promise<void>;
   onEditManual: (type: 'expense' | 'income' | 'transfer', data?: any) => void;
   onNavigate: (tab: string) => void;
 }
 
-export default function SmartTransactionInput({ 
-  onEditManual, 
-  onNavigate 
+export default function SmartTransactionInput({
+  onEditManual,
+  onNavigate
 }: SmartTransactionInputProps) {
   const actions = [
-    { 
-      id: 'expense', 
-      label: 'Record Expense', 
+    {
+      id: 'expense',
+      label: 'Record Expense',
       description: 'Log a new spending',
-      icon: ArrowDownRight, 
-      color: 'text-red-400', 
+      icon: ArrowDownRight,
+      color: 'text-red-400',
       bg: 'bg-red-400/5',
       border: 'hover:border-red-400/30'
     },
-    { 
-      id: 'income', 
-      label: 'Record Income', 
+    {
+      id: 'income',
+      label: 'Record Income',
       description: 'Log new earnings',
-      icon: ArrowUpRight, 
-      color: 'text-emerald-400', 
+      icon: ArrowUpRight,
+      color: 'text-emerald-400',
       bg: 'bg-emerald-400/5',
       border: 'hover:border-emerald-400/30'
     },
-    { 
-      id: 'transfer', 
-      label: 'Transfer Funds', 
+    {
+      id: 'transfer',
+      label: 'Transfer Funds',
       description: 'Move money between accounts',
-      icon: ArrowLeftRight, 
-      color: 'text-blue-400', 
+      icon: ArrowLeftRight,
+      color: 'text-blue-400',
       bg: 'bg-blue-400/5',
       border: 'hover:border-blue-400/30'
     },
-    { 
-      id: 'settings', 
-      label: 'Add Account', 
+    {
+      id: 'settings',
+      label: 'Add Account',
       description: 'Configure new bank or asset',
-      icon: Plus, 
-      color: 'text-zinc-400', 
+      icon: Plus,
+      color: 'text-zinc-400',
       bg: 'bg-zinc-400/5',
       border: 'hover:border-zinc-400/30'
     },
@@ -65,14 +63,14 @@ export default function SmartTransactionInput({
     <div className="bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8 relative overflow-hidden group shadow-2xl">
       {/* Decorative Background Glow */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none" />
-      
+
       <div className="relative z-10 space-y-6 lg:space-y-8">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/10">
-            <Sparkles className="w-5 h-5 lg:w-6 lg:h-6" />
+            <Wallet className="w-5 h-5 lg:w-6 lg:h-6" />
           </div>
           <div>
-            <h3 className="text-lg lg:text-xl font-bold text-white tracking-tight">What would you like to do?</h3>
+            <h3 className="text-lg lg:text-xl font-bold text-white tracking-tight">Quick Actions</h3>
             <p className="text-zinc-500 text-xs lg:text-sm">Select an action to manage your wealth.</p>
           </div>
         </div>
@@ -96,7 +94,7 @@ export default function SmartTransactionInput({
             >
               <div className={cn(
                 "w-10 h-10 lg:w-12 lg:h-12 rounded-xl flex items-center justify-center transition-all duration-300 group-hover/card:scale-110",
-                action.bg, 
+                action.bg,
                 action.color
               )}>
                 <action.icon className="w-5 h-5 lg:w-6 lg:h-6" />
@@ -110,26 +108,5 @@ export default function SmartTransactionInput({
         </div>
       </div>
     </div>
-  );
-}
-
-
-function ArrowRight(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M5 12h14" />
-      <path d="m12 5 7 7-7 7" />
-    </svg>
   );
 }

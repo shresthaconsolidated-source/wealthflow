@@ -1,17 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   TrendingUp,
-  TrendingDown,
   Target,
   Zap,
   AlertCircle,
   CheckCircle2,
-  ChevronRight,
   ArrowRight
 } from 'lucide-react';
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -42,17 +38,17 @@ export default function Analysis() {
   const hasData = data.transactions && data.transactions.length > 0;
 
   const topInsights = hasData ? [
-    { title: 'Initial Analysis', text: 'We are monitoring your new transactions to establish spending baselines.', color: 'blue', icon: Target, trend: TrendingUp }
+    { title: 'Spending Baseline', text: 'We are monitoring your transactions to establish spending baselines.', color: 'blue', icon: Target, trend: TrendingUp }
   ] : [
-    { title: 'Awaiting Data', text: 'Add accounts and transactions to begin intelligently analyzing your financial patterns.', color: 'emerald', icon: Zap, trend: TrendingUp }
+    { title: 'Awaiting Data', text: 'Add accounts and transactions to begin analyzing your financial patterns.', color: 'emerald', icon: Zap, trend: TrendingUp }
   ];
 
   return (
     <div className="space-y-8 lg:space-y-10 max-w-7xl mx-auto pb-12 lg:pb-0">
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-6">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">Intelligent Analysis</h1>
-          <p className="text-zinc-500 mt-1 text-sm lg:text-base">Deep dive into your financial patterns and future projections.</p>
+          <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">Financial Analysis</h1>
+          <p className="text-zinc-500 mt-1 text-sm lg:text-base">Deep dive into your financial patterns and net worth growth.</p>
         </div>
         <div className="flex gap-1 p-1 bg-white/5 rounded-xl border border-white/5 self-start">
           <button className="px-4 py-2 rounded-lg bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20">Monthly</button>
@@ -140,7 +136,7 @@ export default function Analysis() {
             <div className="space-y-6">
               <div className="text-sm text-zinc-400 p-4 bg-white/5 rounded-2xl border border-white/5">
                 <AlertCircle className="w-5 h-5 text-blue-400 mb-2" />
-                More transactions are over time required to generate AI-driven category budget insights. Keep tracking your spending!
+                More transactions are over time required to generate intelligent category budget insights. Keep tracking your spending!
               </div>
             </div>
           ) : (
