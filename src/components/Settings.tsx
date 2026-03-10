@@ -351,6 +351,7 @@ export default function Settings() {
                 <option value="EUR">EUR (€)</option>
                 <option value="GBP">GBP (£)</option>
                 <option value="INR">INR (₹)</option>
+                <option value="NPR">NPR (रू)</option>
               </select>
             </div>
             <div className="p-8 rounded-3xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/10 flex flex-col justify-between gap-6">
