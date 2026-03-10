@@ -36,6 +36,17 @@ export default function SmartTransactionInput({ accounts, categories, onConfirm,
   const [quickNote, setQuickNote] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Clarification state — holds fields that need user input before saving
+  const [clarifyData, setClarifyData] = useState<{
+    parsed: ParsedTransaction;
+    resolvedCategoryId: string;
+    resolvedFromId: string;
+    resolvedToId: string;
+    needCategory: boolean;
+    needFrom: boolean;
+    needTo: boolean;
+  } | null>(null);
+
   useEffect(() => {
     if (input.trim().length > 2) {
       const result = parseTransactionMessage(input, accounts, categories);
@@ -58,26 +69,61 @@ export default function SmartTransactionInput({ accounts, categories, onConfirm,
 
   const handleConfirmParsed = async () => {
     if (!parsed) return;
+
+    const fromAcc = resolveAccount(parsed.from_account_name);
+    const toAcc = resolveAccount(parsed.to_account_name);
+    const cat = resolveCategory(parsed.category_keyword, parsed.type);
+
+    // Determine what's uncertain / missing
+    const needCategory = parsed.type !== 'transfer' && !cat;
+    const needFrom = (parsed.type === 'expense' || parsed.type === 'transfer') && !fromAcc;
+    const needTo = (parsed.type === 'income' || parsed.type === 'transfer') && !toAcc;
+    const isAmbiguous = parsed.confidence === 'low' && accounts.length > 1;
+
+    if (needCategory || needFrom || needTo || isAmbiguous) {
+      setClarifyData({
+        parsed,
+        resolvedCategoryId: cat?.id || '',
+        resolvedFromId: fromAcc?.id || (accounts[0]?.id ?? ''),
+        resolvedToId: toAcc?.id || (accounts[0]?.id ?? ''),
+        needCategory: needCategory || !cat,
+        needFrom: needFrom || isAmbiguous,
+        needTo: needTo || (parsed.type === 'transfer'),
+      });
+      return;
+    }
+
+    await doSave({
+      type: parsed.type, amount: parsed.amount, note: parsed.note, date: parsed.date,
+      from_account_id: fromAcc?.id || '', to_account_id: toAcc?.id || '', category_id: cat?.id || '',
+    });
+  };
+
+  const doSave = async (data: any) => {
     setSaving(true);
     try {
-      const fromAcc = resolveAccount(parsed.from_account_name);
-      const toAcc = resolveAccount(parsed.to_account_name);
-      const cat = resolveCategory(parsed.category_keyword, parsed.type);
-      await onConfirm({
-        type: parsed.type,
-        amount: parsed.amount,
-        note: parsed.note,
-        date: parsed.date,
-        from_account_id: fromAcc?.id || '',
-        to_account_id: toAcc?.id || '',
-        category_id: cat?.id || '',
-      });
+      await onConfirm(data);
       setInput('');
       setParsed(null);
+      setClarifyData(null);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch { /* handled by parent */ }
     setSaving(false);
+  };
+
+  const handleClarifyConfirm = async () => {
+    if (!clarifyData) return;
+    const { parsed, resolvedCategoryId, resolvedFromId, resolvedToId } = clarifyData;
+    await doSave({
+      type: parsed.type,
+      amount: parsed.amount,
+      note: parsed.note,
+      date: parsed.date,
+      category_id: resolvedCategoryId,
+      from_account_id: resolvedFromId,
+      to_account_id: resolvedToId,
+    });
   };
 
   const handleEditParsed = () => {
@@ -338,6 +384,121 @@ export default function SmartTransactionInput({ accounts, categories, onConfirm,
                   className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white font-bold rounded-2xl text-base transition-all shadow-lg shadow-emerald-500/20"
                 >
                   {saving ? 'Saving…' : `Save ${quickAction.label}`}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ---- Clarification Modal ---- */}
+      <AnimatePresence>
+        {clarifyData && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setClarifyData(null)}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
+            />
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 z-[60] bg-[#151518] border-t border-white/10 rounded-t-[32px] p-6 pb-10 shadow-2xl max-w-lg mx-auto"
+            >
+              <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
+
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3 mb-6">
+                <div>
+                  <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-1">⚠️ Need a bit more info</p>
+                  <h3 className="text-white font-bold text-lg">Confirm Details</h3>
+                  <p className="text-zinc-500 text-sm mt-0.5">
+                    We parsed <span className="text-white font-bold">{formatCurrency(clarifyData.parsed.amount)}</span> as a{' '}
+                    <span className={cn(
+                      'font-bold',
+                      clarifyData.parsed.type === 'income' ? 'text-emerald-400' :
+                        clarifyData.parsed.type === 'expense' ? 'text-red-400' : 'text-blue-400'
+                    )}>{clarifyData.parsed.type}</span>.
+                    Please confirm the missing fields below.
+                  </p>
+                </div>
+                <button onClick={() => setClarifyData(null)} className="p-2 rounded-xl bg-white/5 text-zinc-400 hover:text-white flex-shrink-0">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Category */}
+                {clarifyData.needCategory && clarifyData.parsed.type !== 'transfer' && (
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">
+                      📂 Category
+                    </label>
+                    <select
+                      value={clarifyData.resolvedCategoryId}
+                      onChange={e => setClarifyData(d => d ? { ...d, resolvedCategoryId: e.target.value } : d)}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 [&>option]:bg-[#151518] [&>option]:text-white"
+                    >
+                      <option value="">Select category…</option>
+                      {categories.filter(c => c.type === clarifyData.parsed.type).map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* From Account */}
+                {clarifyData.needFrom && (
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">
+                      {clarifyData.parsed.type === 'income' ? '🏦 To Account' : '🏦 From Account'}
+                    </label>
+                    <select
+                      value={clarifyData.resolvedFromId}
+                      onChange={e => setClarifyData(d => d ? { ...d, resolvedFromId: e.target.value } : d)}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 [&>option]:bg-[#151518] [&>option]:text-white"
+                    >
+                      <option value="">Select account…</option>
+                      {accounts.map(a => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* To Account (transfers only) */}
+                {clarifyData.needTo && (
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">
+                      {clarifyData.parsed.type === 'transfer' ? '➡️ To Account' : '🏦 Account'}
+                    </label>
+                    <select
+                      value={clarifyData.resolvedToId}
+                      onChange={e => setClarifyData(d => d ? { ...d, resolvedToId: e.target.value } : d)}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 [&>option]:bg-[#151518] [&>option]:text-white"
+                    >
+                      <option value="">Select account…</option>
+                      {accounts.map(a => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleClarifyConfirm}
+                  disabled={saving ||
+                    (clarifyData.needCategory && clarifyData.parsed.type !== 'transfer' && !clarifyData.resolvedCategoryId) ||
+                    (clarifyData.needFrom && !clarifyData.resolvedFromId) ||
+                    (clarifyData.needTo && !clarifyData.resolvedToId)
+                  }
+                  className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white font-bold rounded-2xl text-base transition-all shadow-lg shadow-emerald-500/20 mt-2"
+                >
+                  {saving ? 'Saving…' : 'Confirm & Save'}
                 </button>
               </div>
             </motion.div>

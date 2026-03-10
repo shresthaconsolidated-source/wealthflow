@@ -42,6 +42,13 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // Close action dropdown when clicking outside
+  React.useEffect(() => {
+    const close = () => setOpenMenuId(null);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, []);
+
   const { fetchWithAuth } = useApi();
 
   const fetchTransactions = () => {
@@ -281,9 +288,32 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                         </p>
                       </td>
                       <td className="px-8 py-6 text-right">
-                        <button className="p-3 rounded-xl hover:bg-white/5 text-zinc-500 hover:text-white transition-all">
-                          <MoreVertical className="w-5 h-5" />
-                        </button>
+                        <div className="relative" onClick={e => e.stopPropagation()}>
+                          <button
+                            onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
+                            className="p-3 rounded-xl hover:bg-white/5 text-zinc-500 hover:text-white transition-all"
+                          >
+                            <MoreVertical className="w-5 h-5" />
+                          </button>
+                          {openMenuId === t.id && (
+                            <div className="absolute right-0 top-12 z-50 bg-[#1a1a1f] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[140px]">
+                              <button
+                                onClick={() => handleEditTransaction(t)}
+                                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-zinc-300 hover:text-white hover:bg-white/5 transition-all"
+                              >
+                                <Edit2 className="w-4 h-4 text-blue-400" />
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTransaction(t.id)}
+                                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/5 transition-all border-t border-white/5"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -386,18 +416,40 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
               className="bg-[#151518] border-t lg:border border-white/10 rounded-t-[40px] lg:rounded-[40px] w-full max-w-xl relative z-10 overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar"
             >
               <div className="p-8 border-b border-white/5 sticky top-0 bg-[#151518]/80 backdrop-blur-xl z-20">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-5">
                   <div>
-                    <h2 className="text-2xl font-bold text-white capitalize">Record {activeType}</h2>
+                    <h2 className="text-2xl font-bold text-white capitalize">{editingId ? 'Edit' : 'New'} Transaction</h2>
                     <p className="text-zinc-500 mt-1 text-sm">Fill in the details below.</p>
                   </div>
                   <button
-                    onClick={() => setShowAddModal(false)}
+                    onClick={() => { setShowAddModal(false); setEditingId(null); }}
                     className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white"
                   >
                     <Plus className="w-6 h-6 rotate-45" />
                   </button>
                 </div>
+                {/* Type switcher tabs */}
+                {!editingId && (
+                  <div className="flex p-1 bg-white/5 rounded-2xl gap-1">
+                    {(['expense', 'income', 'transfer'] as const).map(type => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setActiveType(type)}
+                        className={cn(
+                          'flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all capitalize',
+                          activeType === type
+                            ? type === 'income' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
+                              : type === 'expense' ? 'bg-red-500 text-white shadow-lg shadow-red-500/20'
+                                : 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                            : 'text-zinc-500 hover:text-white'
+                        )}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <form onSubmit={handleSubmit} className="p-8 space-y-8">
@@ -499,16 +551,21 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                 <div className="flex flex-col sm:flex-row gap-4 pt-4 pb-8 lg:pb-0">
                   <button
                     type="button"
-                    onClick={() => setShowAddModal(false)}
+                    onClick={() => { setShowAddModal(false); setEditingId(null); }}
                     className="order-2 sm:order-1 flex-1 px-6 py-5 rounded-2xl border border-white/5 text-zinc-400 font-bold hover:bg-white/5 transition-all text-sm uppercase tracking-widest"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="order-1 sm:order-2 flex-1 px-6 py-5 rounded-2xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20 text-sm uppercase tracking-widest"
+                    className={cn(
+                      "order-1 sm:order-2 flex-1 px-6 py-5 rounded-2xl text-white font-bold transition-all shadow-xl text-sm uppercase tracking-widest",
+                      activeType === 'income' ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20' :
+                        activeType === 'expense' ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20' :
+                          'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20'
+                    )}
                   >
-                    Save Transaction
+                    {editingId ? 'Save Changes' : 'Save Transaction'}
                   </button>
                 </div>
               </form>
