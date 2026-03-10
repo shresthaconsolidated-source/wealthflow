@@ -22,23 +22,39 @@ import { useApi } from '@/src/hooks/useApi';
 
 export default function Analysis() {
   const [data, setData] = useState<any>(null);
+  const [timeRange, setTimeRange] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
   const { fetchWithAuth } = useApi();
 
   useEffect(() => {
+    // Determine the start date based on the selected time range
+    const now = new Date();
+    let startDate = new Date();
+
+    if (timeRange === 'monthly') {
+      startDate.setMonth(now.getMonth() - 1);
+    } else if (timeRange === 'quarterly') {
+      startDate.setMonth(now.getMonth() - 3);
+    } else if (timeRange === 'yearly') {
+      startDate.setFullYear(now.getFullYear() - 1);
+    }
+
     Promise.all([
-      fetchWithAuth('/api/dashboard?month=' + new Date().toISOString().slice(0, 7)).then(res => res.json()),
+      fetchWithAuth(`/api/dashboard?month=${now.toISOString().slice(0, 7)}`).then(res => res.json()),
       fetchWithAuth('/api/transactions').then(res => res.json())
-    ]).then(([dashboardData, transactions]) => {
-      setData({ ...dashboardData, transactions });
+    ]).then(([dashboardData, allTransactions]) => {
+      // Filter transactions based on the selected time range
+      const filteredTransactions = allTransactions.filter((t: any) => new Date(t.date) >= startDate);
+
+      setData({ ...dashboardData, transactions: filteredTransactions });
     }).catch(console.error);
-  }, [fetchWithAuth]);
+  }, [fetchWithAuth, timeRange]);
 
   if (!data) return <div className="p-8 text-zinc-500">Analyzing your wealth...</div>;
 
   const hasData = data.transactions && data.transactions.length > 0;
 
   const topInsights = hasData ? [
-    { title: 'Spending Baseline', text: 'We are monitoring your transactions to establish spending baselines.', color: 'blue', icon: Target, trend: TrendingUp }
+    { title: 'Spending Baseline', text: `We are monitoring your transactions over the last ${timeRange === 'monthly' ? 'month' : timeRange === 'quarterly' ? 'quarter' : 'year'} to establish spending baselines.`, color: 'blue', icon: Target, trend: TrendingUp }
   ] : [
     { title: 'Awaiting Data', text: 'Add accounts and transactions to begin analyzing your financial patterns.', color: 'emerald', icon: Zap, trend: TrendingUp }
   ];
@@ -51,9 +67,24 @@ export default function Analysis() {
           <p className="text-zinc-500 mt-1 text-sm lg:text-base">Deep dive into your financial patterns and net worth growth.</p>
         </div>
         <div className="flex gap-1 p-1 bg-white/5 rounded-xl border border-white/5 self-start">
-          <button className="px-4 py-2 rounded-lg bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20">Monthly</button>
-          <button className="px-4 py-2 rounded-lg text-zinc-500 text-xs font-bold hover:text-white transition-colors">Quarterly</button>
-          <button className="px-4 py-2 rounded-lg text-zinc-500 text-xs font-bold hover:text-white transition-colors">Yearly</button>
+          <button
+            onClick={() => setTimeRange('monthly')}
+            className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", timeRange === 'monthly' ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : "text-zinc-500 hover:text-white")}
+          >
+            Monthly
+          </button>
+          <button
+            onClick={() => setTimeRange('quarterly')}
+            className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", timeRange === 'quarterly' ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : "text-zinc-500 hover:text-white")}
+          >
+            Quarterly
+          </button>
+          <button
+            onClick={() => setTimeRange('yearly')}
+            className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", timeRange === 'yearly' ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : "text-zinc-500 hover:text-white")}
+          >
+            Yearly
+          </button>
         </div>
       </div>
 

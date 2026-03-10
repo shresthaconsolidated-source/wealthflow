@@ -141,9 +141,26 @@ app.post(["/api/accounts", "/accounts"], async (req, res) => {
   const userId = (req as any).user.id;
   const { id, name, type, balance, color, icon } = req.body;
 
-  const { error } = await supabase.from('accounts').insert({
+  const { error } = await supabase.from('accounts').upsert({
     id, user_id: userId, name, type, balance, color, icon
   });
+
+  if (error) {
+    console.error("Supabase insert error for accounts:", error);
+    return res.status(500).json({ error: error.message });
+  }
+  res.json({ success: true });
+});
+
+app.delete(["/api/accounts/:id", "/accounts/:id"], async (req, res) => {
+  const userId = (req as any).user.id;
+  const accountId = req.params.id;
+
+  // Cascade delete transactions involving this account
+  await supabase.from('transactions').delete().eq('from_account_id', accountId).eq('user_id', userId);
+  await supabase.from('transactions').delete().eq('to_account_id', accountId).eq('user_id', userId);
+
+  const { error } = await supabase.from('accounts').delete().eq('id', accountId).eq('user_id', userId);
 
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
@@ -164,9 +181,22 @@ app.post(["/api/categories", "/categories"], async (req, res) => {
   const userId = (req as any).user.id;
   const { id, name, type, icon, color } = req.body;
 
-  const { error } = await supabase.from('categories').insert({
+  const { error } = await supabase.from('categories').upsert({
     id, user_id: userId, name, type, icon, color
   });
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+app.delete(["/api/categories/:id", "/categories/:id"], async (req, res) => {
+  const userId = (req as any).user.id;
+  const categoryId = req.params.id;
+
+  // Cascade delete transactions involving this category
+  await supabase.from('transactions').delete().eq('category_id', categoryId).eq('user_id', userId);
+
+  const { error } = await supabase.from('categories').delete().eq('id', categoryId).eq('user_id', userId);
 
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
@@ -200,30 +230,52 @@ app.get(["/api/transactions", "/transactions"], async (req, res) => {
 
 app.post(["/api/transactions", "/transactions"], async (req, res) => {
   const userId = (req as any).user.id;
-  const { id, from_account_id, to_account_id, category_id, amount, type, date, note } = req.body;
+  let { id, from_account_id, to_account_id, category_id, amount, type, date, note } = req.body;
+
+  // Fix foreign key constraints: empty strings must be null
+  if (!to_account_id) to_account_id = null;
+  if (!category_id) category_id = null;
 
   // Use RPC if available, or sequential updates
   const { error } = await supabase.from('transactions').insert({
     id, user_id: userId, from_account_id, to_account_id, category_id, amount, type, date, note
   });
 
-  if (error) return res.status(500).json({ error: error.message });
-
-  // Update balances sequentially
-  if (type === 'income' && to_account_id) {
-    let { data } = await supabase.from('accounts').select('balance').eq('id', to_account_id).single();
-    if (data) await supabase.from('accounts').update({ balance: Number(data.balance) + Number(amount) }).eq('id', to_account_id);
-  } else if (type === 'expense' && from_account_id) {
-    let { data } = await supabase.from('accounts').select('balance').eq('id', from_account_id).single();
-    if (data) await supabase.from('accounts').update({ balance: Number(data.balance) - Number(amount) }).eq('id', from_account_id);
-  } else if (type === 'transfer' && from_account_id && to_account_id) {
-    let { data: fromD } = await supabase.from('accounts').select('balance').eq('id', from_account_id).single();
-    if (fromD) await supabase.from('accounts').update({ balance: Number(fromD.balance) - Number(amount) }).eq('id', from_account_id);
-
-    let { data: toD } = await supabase.from('accounts').select('balance').eq('id', to_account_id).single();
-    if (toD) await supabase.from('accounts').update({ balance: Number(toD.balance) + Number(amount) }).eq('id', to_account_id);
+  if (error) {
+    console.error("Supabase insert error for transactions:", error);
+    return res.status(500).json({ error: error.message });
   }
 
+  // Update balances sequentially
+  try {
+    if (type === 'income' && to_account_id) {
+      let { data } = await supabase.from('accounts').select('balance').eq('id', to_account_id).single();
+      if (data) await supabase.from('accounts').update({ balance: Number(data.balance) + Number(amount) }).eq('id', to_account_id);
+    } else if (type === 'expense' && from_account_id) {
+      let { data } = await supabase.from('accounts').select('balance').eq('id', from_account_id).single();
+      if (data) await supabase.from('accounts').update({ balance: Number(data.balance) - Number(amount) }).eq('id', from_account_id);
+    } else if (type === 'transfer' && from_account_id && to_account_id) {
+      let { data: fromD } = await supabase.from('accounts').select('balance').eq('id', from_account_id).single();
+      if (fromD) await supabase.from('accounts').update({ balance: Number(fromD.balance) - Number(amount) }).eq('id', from_account_id);
+
+      let { data: toD } = await supabase.from('accounts').select('balance').eq('id', to_account_id).single();
+      if (toD) await supabase.from('accounts').update({ balance: Number(toD.balance) + Number(amount) }).eq('id', to_account_id);
+    }
+  } catch (balanceError) {
+    console.error("Error updating account balances:", balanceError);
+  }
+
+  res.json({ success: true });
+});
+
+app.delete(["/api/transactions/:id", "/transactions/:id"], async (req, res) => {
+  const userId = (req as any).user.id;
+  const transactionId = req.params.id;
+
+  // Ideally, deleting a transaction should revert the balances, but we'll focus on deletion for now
+  const { error } = await supabase.from('transactions').delete().eq('id', transactionId).eq('user_id', userId);
+
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
 

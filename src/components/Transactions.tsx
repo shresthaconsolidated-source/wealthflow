@@ -149,7 +149,6 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
       <SmartTransactionInput
         accounts={accounts}
         categories={categories}
-        transactions={transactions}
         onConfirm={handleSmartConfirm}
         onEditManual={handleSmartEdit}
         onNavigate={() => setActiveTab('settings')}
@@ -379,9 +378,15 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                   </label>
                   <select
                     required
-                    value={formData.from_account_id}
-                    onChange={(e) => setFormData({ ...formData, from_account_id: e.target.value })}
-                    className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm appearance-none"
+                    value={activeType === 'income' ? formData.to_account_id : formData.from_account_id}
+                    onChange={(e) => {
+                      if (activeType === 'income') {
+                        setFormData({ ...formData, to_account_id: e.target.value })
+                      } else {
+                        setFormData({ ...formData, from_account_id: e.target.value })
+                      }
+                    }}
+                    className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm appearance-none [&>option]:bg-[#151518] [&>option]:text-white"
                   >
                     <option value="">Select Account</option>
                     {accounts.map(acc => (
@@ -397,7 +402,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                       required
                       value={formData.to_account_id}
                       onChange={(e) => setFormData({ ...formData, to_account_id: e.target.value })}
-                      className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm appearance-none"
+                      className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm appearance-none [&>option]:bg-[#151518] [&>option]:text-white"
                     >
                       <option value="">Select Account</option>
                       {accounts.map(acc => (
@@ -414,7 +419,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                       required
                       value={formData.category_id}
                       onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                      className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm appearance-none"
+                      className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm appearance-none [&>option]:bg-[#151518] [&>option]:text-white"
                     >
                       <option value="">Select Category</option>
                       {categories.filter(c => c.type === activeType).map(cat => (

@@ -24,7 +24,15 @@ export function useApi() {
             }
 
             if (!response.ok) {
-                throw new Error(`API Error: ${response.statusText}`);
+                let errorMessage = `API Error: ${response.statusText}`;
+                try {
+                    // Try to parse JSON error message from backend
+                    const data = await response.clone().json();
+                    if (data.error) errorMessage = data.error;
+                } catch (e) {
+                    // ignore generic parse error
+                }
+                throw new Error(errorMessage);
             }
 
             return response;
