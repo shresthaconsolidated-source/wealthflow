@@ -8,9 +8,12 @@ import Settings from '@/src/components/Settings';
 import { Wallet, Shield, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import MobileBottomNav from '@/src/components/MobileBottomNav';
 import MobileHeader from '@/src/components/MobileHeader';
 import FAB from '@/src/components/FAB';
+
+const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 export default function App() {
   const { user, loading, login } = useAuth();
@@ -55,13 +58,19 @@ export default function App() {
                 <p className="text-zinc-500">Sign in to access your private dashboard.</p>
               </div>
 
-              <button 
-                onClick={login}
-                className="w-full bg-white text-black hover:bg-zinc-200 py-4 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-                Continue with Google
-              </button>
+              <div className="flex justify-center">
+                <GoogleLogin
+                  onSuccess={(credentialResponse) => {
+                    login(credentialResponse.credential);
+                  }}
+                  onError={() => {
+                    console.log('Login Failed');
+                  }}
+                  useOneTap
+                  theme="filled_black"
+                  shape="pill"
+                />
+              </div>
 
               <div className="flex items-center gap-4 py-2">
                 <div className="h-px flex-1 bg-white/5"></div>
@@ -87,30 +96,32 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-zinc-100 flex flex-col lg:flex-row">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      <MobileHeader />
-      
-      <main className="flex-1 lg:ml-64 min-h-screen pb-24 lg:pb-0">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="p-4 lg:p-8"
-          >
-            {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
-            {activeTab === 'transactions' && <Transactions setActiveTab={setActiveTab} />}
-            {activeTab === 'analysis' && <Analysis />}
-            {activeTab === 'settings' && <Settings />}
-          </motion.div>
-        </AnimatePresence>
-      </main>
+    <GoogleOAuthProvider clientId={clientId}>
+      <div className="min-h-screen bg-[#0A0A0B] text-zinc-100 flex flex-col lg:flex-row">
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+        <MobileHeader />
+        
+        <main className="flex-1 lg:ml-64 min-h-screen pb-24 lg:pb-0">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="p-4 lg:p-8"
+            >
+              {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
+              {activeTab === 'transactions' && <Transactions setActiveTab={setActiveTab} />}
+              {activeTab === 'analysis' && <Analysis />}
+              {activeTab === 'settings' && <Settings />}
+            </motion.div>
+          </AnimatePresence>
+        </main>
 
-      <FAB onClick={() => setActiveTab('transactions')} />
-      <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
-    </div>
+        <FAB onClick={() => setActiveTab('transactions')} />
+        <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      </div>
+    </GoogleOAuthProvider>
   );
 }

@@ -4,6 +4,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import Database from "better-sqlite3";
 import dotenv from "dotenv";
+import { OAuth2Client } from "google-auth-library";
+import jwt from "jsonwebtoken";
 
 dotenv.config();
 
@@ -11,6 +13,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const db = new Database("finance.db");
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
 
 // Initialize Database
 db.exec(`
@@ -82,13 +86,67 @@ async function startServer() {
 
   app.use(express.json());
 
-  // Mock Auth for now (will implement real Google OAuth later)
-  // In a real app, we'd use a session/JWT
+  // Middleware to authenticate requests via JWT
   app.use((req, res, next) => {
-    // For demo purposes, we'll use a hardcoded user if not provided
-    // In production, this would come from a verified token
+    // Skip auth for login route
+    if (req.path === '/api/auth/google') {
+      return next();
+    }
+
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        (req as any).user = decoded;
+        return next();
+      } catch (err) {
+        // Token invalid, fall through to demo user or 401
+      }
+    }
+
+    // For demo purposes (if no real token provided but not required yet by frontend state)
+    // We keep the demo-user so the app doesn't break for unauthorized local testing
     (req as any).user = { id: 'demo-user', email: 'demo@example.com' };
     next();
+  });
+
+  // Auth Route
+  app.post("/api/auth/google", async (req, res) => {
+    const { token } = req.body;
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: token,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+
+      if (!payload) {
+        return res.status(400).json({ error: "Invalid Google token" });
+      }
+
+      const { sub: googleId, email, name, picture } = payload;
+
+      // Upsert user in database
+      const existingUser = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+      if (!existingUser) {
+        db.prepare("INSERT INTO users (id, email, name, picture) VALUES (?, ?, ?, ?)").run(googleId, email, name, picture);
+      } else {
+        db.prepare("UPDATE users SET name = ?, picture = ? WHERE email = ?").run(name, picture, email);
+      }
+
+      // Generate session JWT
+      const sessionToken = jwt.sign(
+        { id: googleId || existingUser.id, email, name, picture },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      res.json({ token: sessionToken, user: { id: googleId || existingUser.id, email, name, picture } });
+    } catch (error) {
+      console.error("Error verifying Google token:", error);
+      res.status(401).json({ error: "Authentication failed" });
+    }
   });
 
   // API Routes
@@ -144,7 +202,7 @@ async function startServer() {
   app.post("/api/transactions", (req, res) => {
     const userId = (req as any).user.id;
     const { id, from_account_id, to_account_id, category_id, amount, type, date, note } = req.body;
-    
+
     const transaction = db.transaction(() => {
       db.prepare("INSERT INTO transactions (id, user_id, from_account_id, to_account_id, category_id, amount, type, date, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .run(id, userId, from_account_id, to_account_id, category_id, amount, type, date, note);
