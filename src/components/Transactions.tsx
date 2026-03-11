@@ -296,7 +296,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
               </button>
             )}
           </div>
-          <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0 relative filter-dropdown z-30">
+          <div className="flex gap-2 w-full md:w-auto overflow-visible pb-1 md:pb-0 relative filter-dropdown z-30">
             {hasActiveFilters && (
               <button 
                 onClick={clearFilters}
@@ -307,18 +307,18 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
             )}
 
             {/* Filters Button & Dropdown */}
-            <div className="relative inline-block">
+            <div className="relative inline-block z-40">
               <button 
                 onClick={(e) => { e.stopPropagation(); setShowFiltersMenu(!showFiltersMenu); setShowDateMenu(false); }}
                 className={cn(
-                  "flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all text-xs font-bold uppercase tracking-widest",
+                  "flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all text-xs font-bold uppercase tracking-widest relative z-50",
                   (filterType !== 'all' || filterCategoryId !== 'all' || filterAccountId !== 'all') 
                     ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" 
                     : "border-white/5 bg-[#151518] text-zinc-400 hover:text-white hover:bg-white/5"
                 )}
               >
-                <Filter className="w-4 h-4" />
-                <span>Filters</span>
+                <Filter className="w-4 h-4 pointer-events-none" />
+                <span className="pointer-events-none">Filters</span>
               </button>
               
               <AnimatePresence>
@@ -370,18 +370,18 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
             </div>
 
             {/* Date Range Button & Dropdown */}
-            <div className="relative inline-block">
+            <div className="relative inline-block z-40">
               <button 
                 onClick={(e) => { e.stopPropagation(); setShowDateMenu(!showDateMenu); setShowFiltersMenu(false); }}
                 className={cn(
-                  "flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all text-xs font-bold uppercase tracking-widest",
+                  "flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all text-xs font-bold uppercase tracking-widest relative z-50",
                   (dateStart || dateEnd) 
                     ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" 
                     : "border-white/5 bg-[#151518] text-zinc-400 hover:text-white hover:bg-white/5"
                 )}
               >
-                <Calendar className="w-4 h-4" />
-                <span>Date Range</span>
+                <Calendar className="w-4 h-4 pointer-events-none" />
+                <span className="pointer-events-none">Date Range</span>
               </button>
 
               <AnimatePresence>
