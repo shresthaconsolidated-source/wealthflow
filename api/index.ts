@@ -128,21 +128,62 @@ app.get(["/api/user", "/user"], (req, res) => {
 
 app.get(["/api/accounts", "/accounts"], async (req, res) => {
   const userId = (req as any).user.id;
-  const { data, error } = await supabase
+  const { data: accounts, error } = await supabase
     .from('accounts')
     .select('*')
     .eq('user_id', userId);
 
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+
+  const { data: txs } = await supabase
+    .from('transactions')
+    .select('from_account_id, to_account_id, amount, type')
+    .eq('user_id', userId);
+
+  const augmentedAccounts = (accounts || []).map(acc => {
+    let netChange = 0;
+    for (const t of (txs || [])) {
+      if (t.type === 'income' && t.to_account_id === acc.id) netChange += Number(t.amount);
+      if (t.type === 'expense' && t.from_account_id === acc.id) netChange -= Number(t.amount);
+      if (t.type === 'transfer') {
+        if (t.to_account_id === acc.id) netChange += Number(t.amount);
+        if (t.from_account_id === acc.id) netChange -= Number(t.amount);
+      }
+    }
+    return { ...acc, initial_balance: Number(acc.balance) - netChange };
+  });
+
+  res.json(augmentedAccounts);
 });
 
 app.post(["/api/accounts", "/accounts"], async (req, res) => {
   const userId = (req as any).user.id;
-  const { id, name, type, balance, color, icon } = req.body;
+  const { id, name, type, initial_balance, color, icon } = req.body;
+
+  let finalBalance = Number(initial_balance || 0);
+
+  const { data: existing } = await supabase.from('accounts').select('id').eq('id', id).eq('user_id', userId).single();
+  
+  if (existing) {
+    const { data: txs } = await supabase
+      .from('transactions')
+      .select('from_account_id, to_account_id, amount, type')
+      .eq('user_id', userId);
+      
+    let netChange = 0;
+    for (const t of (txs || [])) {
+      if (t.type === 'income' && t.to_account_id === id) netChange += Number(t.amount);
+      if (t.type === 'expense' && t.from_account_id === id) netChange -= Number(t.amount);
+      if (t.type === 'transfer') {
+        if (t.to_account_id === id) netChange += Number(t.amount);
+        if (t.from_account_id === id) netChange -= Number(t.amount);
+      }
+    }
+    finalBalance = Number(initial_balance) + netChange;
+  }
 
   const { error } = await supabase.from('accounts').upsert({
-    id, user_id: userId, name, type, balance, color, icon
+    id, user_id: userId, name, type, balance: finalBalance, color, icon
   });
 
   if (error) {

@@ -23,7 +23,7 @@ export default function Settings() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [modalType, setModalType] = useState<'accounts' | 'categories'>('accounts');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: '', type: 'bank', balance: '0' });
+  const [formData, setFormData] = useState({ name: '', type: 'bank', initial_balance: '0' });
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [itemToDelete, setItemToDelete] = useState<{ id: string, type: 'accounts' | 'categories', name: string } | null>(null);
 
@@ -55,7 +55,7 @@ export default function Settings() {
   const handleOpenAddModal = (type: 'accounts' | 'categories', defaultSubType: string) => {
     setModalType(type);
     setEditingId(null);
-    setFormData({ name: '', type: defaultSubType, balance: '0' });
+    setFormData({ name: '', type: defaultSubType, initial_balance: '0' });
     setShowAddModal(true);
   };
 
@@ -65,7 +65,7 @@ export default function Settings() {
     setFormData({
       name: item.name,
       type: item.type,
-      balance: item.balance !== undefined ? item.balance.toString() : '0'
+      initial_balance: item.initial_balance !== undefined ? item.initial_balance.toString() : '0'
     });
     setShowAddModal(true);
   };
@@ -104,7 +104,7 @@ export default function Settings() {
     const id = editingId || (isAccount ? 'acc-' : 'cat-') + Math.random().toString(36).substr(2, 9);
 
     const payload = isAccount ? {
-      id, name: formData.name, type: formData.type || 'bank', balance: parseFloat(formData.balance || '0'), icon: 'Wallet', color: '#3b82f6'
+      id, name: formData.name, type: formData.type || 'bank', initial_balance: parseFloat(formData.initial_balance || '0'), icon: 'Wallet', color: '#3b82f6'
     } : {
       id, name: formData.name, type: formData.type || 'expense', icon: 'Tag', color: '#8b5cf6'
     };
@@ -119,7 +119,7 @@ export default function Settings() {
       if (res.ok) {
         setShowAddModal(false);
         setEditingId(null);
-        setFormData({ name: '', type: 'bank', balance: '0' });
+        setFormData({ name: '', type: 'bank', initial_balance: '0' });
         fetchData();
       } else {
         showError('Failed to save. Ensure all API routes are running.');
@@ -247,8 +247,8 @@ export default function Settings() {
                   </div>
 
                   <div className="pt-4 border-t border-white/5 relative z-10 flex justify-between items-end">
-                    <span className="text-zinc-500 text-xs font-medium">Current Balance</span>
-                    <span className="text-white font-bold text-xl tracking-tight">{formatCurrency(item.balance)}</span>
+                    <span className="text-zinc-500 text-xs font-medium">Initial Balance</span>
+                    <span className="text-white font-bold text-xl tracking-tight">{formatCurrency(item.initial_balance ?? 0)}</span>
                   </div>
                 </div>
               ))
@@ -421,8 +421,8 @@ export default function Settings() {
                     <input
                       type="number"
                       step="0.01"
-                      value={formData.balance}
-                      onChange={e => setFormData({ ...formData, balance: e.target.value })}
+                      value={formData.initial_balance}
+                      onChange={e => setFormData({ ...formData, initial_balance: e.target.value })}
                       className="w-full bg-black/40 border border-white/10 rounded-2xl pl-10 pr-5 py-4 text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
                       required
                     />
