@@ -5,6 +5,7 @@ import Dashboard from '@/src/components/Dashboard';
 import Transactions from '@/src/components/Transactions';
 import Analysis from '@/src/components/Analysis';
 import Settings from '@/src/components/Settings';
+import Donations from '@/src/components/Donations';
 import { Wallet, Shield, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -109,6 +110,7 @@ export default function App() {
                 {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
                 {activeTab === 'transactions' && <Transactions setActiveTab={setActiveTab} />}
                 {activeTab === 'analysis' && <Analysis />}
+                {activeTab === 'donations' && <Donations />}
                 {activeTab === 'settings' && <Settings />}
               </motion.div>
             </AnimatePresence>

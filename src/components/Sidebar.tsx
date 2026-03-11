@@ -1,11 +1,12 @@
 import React from 'react';
-import { 
-  LayoutDashboard, 
-  ArrowLeftRight, 
-  Settings, 
-  TrendingUp, 
+import {
+  LayoutDashboard,
+  ArrowLeftRight,
+  Settings,
+  TrendingUp,
   LogOut,
-  Wallet
+  Wallet,
+  Heart
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -22,6 +23,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight },
     { id: 'analysis', label: 'Analysis', icon: TrendingUp },
+    { id: 'donations', label: 'Donations', icon: Heart },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -42,8 +44,8 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
               onClick={() => setActiveTab(item.id)}
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
-                activeTab === item.id 
-                  ? "bg-white/5 text-emerald-400" 
+                activeTab === item.id
+                  ? "bg-white/5 text-emerald-400"
                   : "text-zinc-500 hover:text-white hover:bg-white/5"
               )}
             >
@@ -73,7 +75,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             <span className="text-xs text-zinc-500 truncate">{user?.email}</span>
           </div>
         </div>
-        <button 
+        <button
           onClick={logout}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-zinc-500 hover:text-red-400 hover:bg-red-400/5 transition-all duration-200"
         >

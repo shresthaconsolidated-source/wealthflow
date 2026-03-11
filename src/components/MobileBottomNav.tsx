@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ArrowLeftRight, PieChart, Settings } from 'lucide-react';
+import { LayoutDashboard, ArrowLeftRight, PieChart, Settings, Heart } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 
 interface MobileBottomNavProps {
@@ -12,6 +12,7 @@ export default function MobileBottomNav({ activeTab, setActiveTab }: MobileBotto
     { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
     { id: 'transactions', label: 'History', icon: ArrowLeftRight },
     { id: 'analysis', label: 'Insights', icon: PieChart },
+    { id: 'donations', label: 'Donations', icon: Heart },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -32,7 +33,7 @@ export default function MobileBottomNav({ activeTab, setActiveTab }: MobileBotto
               activeTab === item.id && "scale-110"
             )} />
             <span className="text-[10px] font-medium uppercase tracking-wider">{item.label}</span>
-            
+
             {activeTab === item.id && (
               <div className="absolute bottom-1 w-1 h-1 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
             )}
