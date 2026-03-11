@@ -201,6 +201,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
       <SmartTransactionInput
         accounts={accounts}
         categories={categories}
+        transactions={transactions}
         onConfirm={handleSmartConfirm}
         onEditManual={handleSmartEdit}
         onNavigate={() => setActiveTab('settings')}

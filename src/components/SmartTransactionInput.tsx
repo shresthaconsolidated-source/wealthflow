@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 interface Props {
   accounts: any[];
   categories: any[];
+  transactions?: any[];
   onConfirm: (data: any) => Promise<void>;
   onEditManual: (type: 'income' | 'expense' | 'transfer', data?: any) => void;
   onNavigate: () => void;
@@ -25,7 +26,7 @@ const TYPE_LABELS = {
   transfer: 'Transfer',
 };
 
-export default function SmartTransactionInput({ accounts, categories, onConfirm, onEditManual, onNavigate }: Props) {
+export default function SmartTransactionInput({ accounts, categories, transactions, onConfirm, onEditManual, onNavigate }: Props) {
   const [input, setInput] = useState('');
   const [parsed, setParsed] = useState<ParsedTransaction | null>(null);
   const [saving, setSaving] = useState(false);
@@ -47,6 +48,83 @@ export default function SmartTransactionInput({ accounts, categories, onConfirm,
     needTo: boolean;
   } | null>(null);
 
+  // Compute dynamic quick actions
+  const dynamicActions = React.useMemo(() => {
+    // 1. Identify pinned actions
+    const pinnedIds = ['salary', 'transfer'];
+    const pinnedActions = QUICK_ACTIONS.filter(a => pinnedIds.includes(a.id));
+    const availableSlots = 9 - pinnedActions.length; // usually 7
+
+    // 2. Compute frequencies of expense notes from transactions
+    const noteFrequencies: Record<string, { count: number, latestDate: string }> = {};
+    if (transactions) {
+      transactions.forEach(t => {
+        if (t.type === 'expense' && t.note) {
+          const rawNote = t.note.trim();
+          const noteKey = rawNote.toLowerCase();
+          
+          // Only track reasonably short notes to avoid absurdly long buttons
+          if (noteKey.length > 0 && noteKey.length <= 20) {
+              if (!noteFrequencies[noteKey]) {
+                noteFrequencies[noteKey] = { count: 0, latestDate: t.date };
+              }
+              noteFrequencies[noteKey].count += 1;
+              if (t.date > noteFrequencies[noteKey].latestDate) {
+                  noteFrequencies[noteKey].latestDate = t.date;
+              }
+          }
+        }
+      });
+    }
+
+    // 3. Filter for frequently used notes (e.g. >= 2 times) and sort by count/recency
+    const frequentNotes = Object.entries(noteFrequencies)
+      .filter(([_, stats]) => stats.count >= 2)
+      .sort((a, b) => b[1].count - a[1].count || new Date(b[1].latestDate).getTime() - new Date(a[1].latestDate).getTime())
+      .map(([noteKey]) => noteKey);
+
+    // 4. Build custom actions based on frequent notes
+    const customActions: QuickAction[] = [];
+    const usedDefaultIds = new Set(pinnedIds);
+
+    for (const note of frequentNotes) {
+      if (customActions.length >= availableSlots) break;
+
+      // Check if a default action perfectly matches this note (case-insensitive)
+      const matchingDefault = QUICK_ACTIONS.find(a => !usedDefaultIds.has(a.id) && a.label.toLowerCase() === note);
+      
+      if (matchingDefault) {
+        customActions.push(matchingDefault);
+        usedDefaultIds.add(matchingDefault.id);
+      } else {
+        // Create a generic action for this note
+        // Attempt to auto-categorize based on keyword matching
+        const baseCategory = categories?.find(c => c.type === 'expense' && c.name?.toLowerCase().includes(note))?.name || 'misc';
+        customActions.push({
+          id: `custom-${note}`,
+          label: note.charAt(0).toUpperCase() + note.slice(1),
+          emoji: '✨', // Generic emoji for custom history entries
+          type: 'expense',
+          categoryKeyword: baseCategory,
+          color: 'zinc',
+        });
+      }
+    }
+
+    // 5. Backfill with unused default actions to maintain exactly 9 buttons
+    const backfillActions: QuickAction[] = [];
+    for (const action of QUICK_ACTIONS) {
+      if (customActions.length + backfillActions.length >= availableSlots) break;
+      if (!usedDefaultIds.has(action.id) && action.type === 'expense') {
+        backfillActions.push(action);
+        usedDefaultIds.add(action.id);
+      }
+    }
+
+    // Combine all
+    return [...customActions, ...backfillActions, ...pinnedActions];
+  }, [transactions, categories]);
+
   useEffect(() => {
     if (input.trim().length > 2) {
       const result = parseTransactionMessage(input, accounts, categories);
@@ -61,7 +139,7 @@ export default function SmartTransactionInput({ accounts, categories, onConfirm,
 
   const resolveCategory = (keyword?: string, type?: string) => {
     if (!keyword) return undefined;
-    return categories.find(c =>
+    return categories?.find(c =>
       c.type === type && (c.name?.toLowerCase().includes(keyword.toLowerCase()))
     );
   };
@@ -305,7 +383,7 @@ export default function SmartTransactionInput({ accounts, categories, onConfirm,
       <div>
         <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-3 px-1">Quick Entry</p>
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-          {QUICK_ACTIONS.map(action => (
+          {dynamicActions.map(action => (
             <button
               key={action.id}
               onClick={() => { setQuickAction(action); setQuickAmount(''); setQuickNote(''); setQuickAccount(accounts[0]?.id || ''); }}
