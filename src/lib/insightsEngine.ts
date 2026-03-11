@@ -19,7 +19,7 @@ export interface Insight {
 }
 
 function pct(a: number, b: number): number {
-    if (b === 0) return 0;
+    if (b === 0) return a === 0 ? 0 : (a > 0 ? 100 : -100);
     return Math.round(((a - b) / Math.abs(b)) * 100);
 }
 

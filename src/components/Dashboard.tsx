@@ -71,22 +71,10 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
 
   const currentMonthLabel = new Date(selectedMonth + '-01').toLocaleString('default', { month: 'short' });
 
-  const months = [];
-  for (let i = chartRange - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    months.push(d.toLocaleString('default', { month: 'short', year: chartRange > 12 ? '2-digit' : undefined }));
-  }
-
-  // Generate a multi-month line for the AreaChart so it's a curve instead of a single dot
-  const chartData = months.map((m, index) => {
-    // For a real app, you'd calculate historical net worth. Here we provide a simple visual trend 
-    // that connects to the current data.totalNetWorth.
-    return {
-      month: m,
-      value: index === chartRange - 1 ? data.totalNetWorth : data.totalNetWorth * (0.8 + (index * (0.2 / chartRange)))
-    };
-  });
+  const chartData = history.slice(-chartRange).map((h) => ({
+    month: h.label,
+    value: h.netWorth
+  }));
 
   const flowData = data.monthlyIncome > 0 || data.monthlyExpense > 0
     ? [{ month: currentMonthLabel, income: data.monthlyIncome, expense: data.monthlyExpense }]

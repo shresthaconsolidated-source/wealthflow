@@ -48,7 +48,7 @@ function areMonthsMonthly(months: string[]): boolean {
         const gap = (by - ay) * 12 + (bm - am);
         if (gap === 1) consecutiveGaps++;
     }
-    return consecutiveGaps >= sorted.length - 2; // allow 1 miss
+    return sorted.length === 2 ? consecutiveGaps === 1 : consecutiveGaps >= sorted.length - 2; // allow 1 miss for 3+ months
 }
 
 export function detectRecurring(transactions: Transaction[]): RecurringResult {

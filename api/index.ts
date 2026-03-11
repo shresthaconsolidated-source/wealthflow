@@ -197,10 +197,6 @@ app.delete(["/api/accounts/:id", "/accounts/:id"], async (req, res) => {
   const userId = (req as any).user.id;
   const accountId = req.params.id;
 
-  // Cascade delete transactions involving this account
-  await supabase.from('transactions').delete().eq('from_account_id', accountId).eq('user_id', userId);
-  await supabase.from('transactions').delete().eq('to_account_id', accountId).eq('user_id', userId);
-
   const { error } = await supabase.from('accounts').delete().eq('id', accountId).eq('user_id', userId);
 
   if (error) return res.status(500).json({ error: error.message });
@@ -233,9 +229,6 @@ app.post(["/api/categories", "/categories"], async (req, res) => {
 app.delete(["/api/categories/:id", "/categories/:id"], async (req, res) => {
   const userId = (req as any).user.id;
   const categoryId = req.params.id;
-
-  // Cascade delete transactions involving this category
-  await supabase.from('transactions').delete().eq('category_id', categoryId).eq('user_id', userId);
 
   const { error } = await supabase.from('categories').delete().eq('id', categoryId).eq('user_id', userId);
 
@@ -275,12 +268,13 @@ app.post(["/api/transactions", "/transactions"], async (req, res) => {
 
   // Fix foreign key constraints: empty strings must be null
   if (!to_account_id) to_account_id = null;
+  if (!from_account_id) from_account_id = null;
   if (!category_id) category_id = null;
 
   // Use RPC if available, or sequential updates
-  const { error } = await supabase.from('transactions').insert({
+  const { data: newTx, error } = await supabase.from('transactions').insert({
     id, user_id: userId, from_account_id, to_account_id, category_id, amount, type, date, note
-  });
+  }).select().single();
 
   if (error) {
     console.error("Supabase insert error for transactions:", error);
@@ -306,7 +300,7 @@ app.post(["/api/transactions", "/transactions"], async (req, res) => {
     console.error("Error updating account balances:", balanceError);
   }
 
-  res.json({ success: true });
+  res.json({ success: true, transaction: newTx });
 });
 
 // UPDATE transaction (delete old, insert new to keep balances accurate)
@@ -316,6 +310,7 @@ app.put(["/api/transactions/:id", "/transactions/:id"], async (req, res) => {
   let { from_account_id, to_account_id, category_id, amount, type, date, note } = req.body;
 
   if (!to_account_id) to_account_id = null;
+  if (!from_account_id) from_account_id = null;
   if (!category_id) category_id = null;
 
   // Fetch old transaction so we can reverse its balance effect
@@ -345,9 +340,9 @@ app.put(["/api/transactions/:id", "/transactions/:id"], async (req, res) => {
   } catch (e) { console.error('Error reversing balance', e); }
 
   // Update the transaction record
-  const { error } = await supabase.from('transactions').update({
+  const { data: updatedTx, error } = await supabase.from('transactions').update({
     from_account_id, to_account_id, category_id, amount, type, date, note
-  }).eq('id', transactionId).eq('user_id', userId);
+  }).eq('id', transactionId).eq('user_id', userId).select().single();
 
   if (error) return res.status(500).json({ error: error.message });
 
@@ -367,7 +362,7 @@ app.put(["/api/transactions/:id", "/transactions/:id"], async (req, res) => {
     }
   } catch (e) { console.error('Error applying new balance', e); }
 
-  res.json({ success: true });
+  res.json({ success: true, transaction: updatedTx });
 });
 
 app.delete(["/api/transactions/:id", "/transactions/:id"], async (req, res) => {

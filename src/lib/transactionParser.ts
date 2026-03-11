@@ -73,16 +73,19 @@ const DATE_WORDS: Record<string, () => string> = {
 
 function extractAmount(text: string): number | null {
     // Match: 1200, 1,200, 1.2k, 12.5, 45000
-    const match = text.match(/\b(\d[\d,]*(?:\.\d+)?)\s*k?\b/i);
+    // We capture the numeric part including commas and decimals.
+    // The trailing 'k' or 'K' is handled outside the numeric capture regex.
+    const match = text.match(/\b(\d+([\.,]\d+)?)\s*(k\b)?/i);
     if (!match) return null;
+    
+    // Replace commas before parsing
     let val = parseFloat(match[1].replace(/,/g, ''));
-    if (text.slice(match.index! + match[0].length - 1, match.index! + match[0].length + 1).toLowerCase() === 'k') {
+    
+    // If the 3rd capture group matched 'k' (case insensitive), multiply by 1000
+    if (match[3] && match[3].toLowerCase() === 'k') {
         val *= 1000;
     }
-    if (/(\d+)\s*k\b/i.test(text)) {
-        const kMatch = text.match(/(\d+)\s*k\b/i);
-        if (kMatch) return parseFloat(kMatch[1]) * 1000;
-    }
+    
     return val;
 }
 
