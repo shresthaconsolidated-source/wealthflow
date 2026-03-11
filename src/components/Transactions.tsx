@@ -55,6 +55,10 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
 
+  // Bulk Action State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+
   // Close action dropdowns when clicking outside
   React.useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -82,6 +86,89 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
     fetchWithAuth('/api/accounts').then(res => res.json()).then(setAccounts).catch(console.error);
     fetchWithAuth('/api/categories').then(res => res.json()).then(setCategories).catch(console.error);
   }, [fetchWithAuth]);
+
+  // Compute filtered transactions
+  const filteredTransactions = React.useMemo(() => {
+    return transactions.filter(t => {
+      // 1. Search Query
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesNote = t.note?.toLowerCase().includes(query);
+        const matchesCategory = t.category_name?.toLowerCase().includes(query);
+        const matchesAccount = t.from_account_name?.toLowerCase().includes(query) || t.to_account_name?.toLowerCase().includes(query);
+        const matchesAmount = t.amount?.toString().includes(query);
+        if (!matchesNote && !matchesCategory && !matchesAccount && !matchesAmount) return false;
+      }
+
+      // 2. Type Filter
+      if (filterType !== 'all' && t.type !== filterType) return false;
+
+      // 3. Category Filter
+      if (filterCategoryId !== 'all' && t.category_id !== filterCategoryId) return false;
+
+      // 4. Account Filter
+      if (filterAccountId !== 'all') {
+        if (t.from_account_id !== filterAccountId && t.to_account_id !== filterAccountId) return false;
+      }
+
+      // 5. Date Range Filter
+      if (dateStart) {
+        const tDate = new Date(t.date).getTime();
+        const sDate = new Date(dateStart).getTime();
+        if (tDate < sDate) return false;
+      }
+      if (dateEnd) {
+        // Add 1 day to end date to make it inclusive of the end day
+        const tDate = new Date(t.date).getTime();
+        const eDate = new Date(dateEnd).getTime() + 86400000;
+        if (tDate >= eDate) return false;
+      }
+
+      return true;
+    });
+  }, [transactions, searchQuery, filterType, filterCategoryId, filterAccountId, dateStart, dateEnd]);
+
+  // Bulk selection handlers
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedIds.length === filteredTransactions.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredTransactions.map(t => t.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedIds.length || isDeletingBulk) return;
+    
+    // Safety check with browser confirm since this is a destructive action
+    if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} transactions? This cannot be undone.`)) {
+      return;
+    }
+
+    setIsDeletingBulk(true);
+    setOpenMenuId(null);
+
+    try {
+      // Issue all delete requests concurrently
+      await Promise.all(
+        selectedIds.map(id => fetchWithAuth(`/api/transactions/${id}`, { method: 'DELETE' }))
+      );
+      
+      setSelectedIds([]); // Clear selection on success
+      fetchTransactions(); // Refresh the list
+    } catch (err) {
+      console.error('Bulk delete failed', err);
+      alert('Failed to delete some transactions. Please try again.');
+    } finally {
+      setIsDeletingBulk(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,52 +280,13 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
     setOpenMenuId(null);
     try {
       await fetchWithAuth(`/api/transactions/${id}`, { method: 'DELETE' });
+      // Deselect if it was selected during a manual standard delete
+      setSelectedIds(prev => prev.filter(i => i !== id));
       fetchTransactions();
     } catch (err) {
       console.error('Delete failed', err);
     }
   };
-
-  // Compute filtered transactions
-  const filteredTransactions = React.useMemo(() => {
-    return transactions.filter(t => {
-      // 1. Search Query
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const matchesNote = t.note?.toLowerCase().includes(query);
-        const matchesCategory = t.category_name?.toLowerCase().includes(query);
-        const matchesAccount = t.from_account_name?.toLowerCase().includes(query) || t.to_account_name?.toLowerCase().includes(query);
-        const matchesAmount = t.amount?.toString().includes(query);
-        if (!matchesNote && !matchesCategory && !matchesAccount && !matchesAmount) return false;
-      }
-
-      // 2. Type Filter
-      if (filterType !== 'all' && t.type !== filterType) return false;
-
-      // 3. Category Filter
-      if (filterCategoryId !== 'all' && t.category_id !== filterCategoryId) return false;
-
-      // 4. Account Filter
-      if (filterAccountId !== 'all') {
-        if (t.from_account_id !== filterAccountId && t.to_account_id !== filterAccountId) return false;
-      }
-
-      // 5. Date Range Filter
-      if (dateStart) {
-        const tDate = new Date(t.date).getTime();
-        const sDate = new Date(dateStart).getTime();
-        if (tDate < sDate) return false;
-      }
-      if (dateEnd) {
-        // Add 1 day to end date to make it inclusive of the end day
-        const tDate = new Date(t.date).getTime();
-        const eDate = new Date(dateEnd).getTime() + 86400000;
-        if (tDate >= eDate) return false;
-      }
-
-      return true;
-    });
-  }, [transactions, searchQuery, filterType, filterCategoryId, filterAccountId, dateStart, dateEnd]);
 
   const hasActiveFilters = filterType !== 'all' || filterCategoryId !== 'all' || filterAccountId !== 'all' || dateStart || dateEnd;
   const clearFilters = () => {
@@ -256,24 +304,55 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
           <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">Transactions</h1>
           <p className="text-zinc-500 mt-1 text-sm lg:text-base">Manage and track every movement of your wealth.</p>
         </div>
-        <button
-          onClick={() => handleSmartEdit('expense')}
-          className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 text-sm lg:text-base"
-        >
-          <Plus className="w-5 h-5" />
-          New Transaction
-        </button>
+        
+        {/* Bulk Actions or New Transaction Button */}
+        {selectedIds.length > 0 ? (
+          <div className="flex items-center gap-4 bg-red-500/10 border border-red-500/20 rounded-2xl px-6 py-3 shadow-lg shadow-red-500/10">
+            <div className="text-red-400 font-bold text-sm">
+              {selectedIds.length} selected
+            </div>
+            <div className="w-px h-6 bg-red-500/20"></div>
+            <button
+              onClick={handleBulkDelete}
+              disabled={isDeletingBulk}
+              className="flex items-center gap-2 text-white bg-red-500 hover:bg-red-600 px-4 py-2 rounded-xl font-bold transition-all text-sm disabled:opacity-50"
+            >
+              {isDeletingBulk ? 'Deleting...' : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  Delete Selected
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => setSelectedIds([])}
+              className="text-zinc-400 hover:text-white px-2 py-2 text-sm font-medium transition-all"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => handleSmartEdit('expense')}
+            className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 text-sm lg:text-base"
+          >
+            <Plus className="w-5 h-5" />
+            New Transaction
+          </button>
+        )}
       </div>
 
       {/* Smart Input Area */}
-      <SmartTransactionInput
-        accounts={accounts}
-        categories={categories}
-        transactions={transactions}
-        onConfirm={handleSmartConfirm}
-        onEditManual={handleSmartEdit}
-        onNavigate={() => setActiveTab('settings')}
-      />
+      {selectedIds.length === 0 && (
+        <SmartTransactionInput
+          accounts={accounts}
+          categories={categories}
+          transactions={transactions}
+          onConfirm={handleSmartConfirm}
+          onEditManual={handleSmartEdit}
+          onNavigate={() => setActiveTab('settings')}
+        />
+      )}
 
       {/* Filters & History */}
       <div className="space-y-4">
@@ -432,7 +511,16 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-white/[0.02] text-zinc-500 text-[10px] uppercase tracking-widest">
-                  <th className="px-8 py-5 font-bold">Date</th>
+                  <th className="px-8 py-5 font-bold w-12">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-white/10 bg-transparent text-emerald-500 focus:ring-emerald-500/50 focus:ring-offset-0 cursor-pointer"
+                      checked={filteredTransactions.length > 0 && selectedIds.length === filteredTransactions.length}
+                      onChange={handleToggleSelectAll}
+                      disabled={filteredTransactions.length === 0}
+                    />
+                  </th>
+                  <th className="px-4 py-5 font-bold">Date</th>
                   <th className="px-8 py-5 font-bold">Transaction</th>
                   <th className="px-8 py-5 font-bold">Category / Account</th>
                   <th className="px-8 py-5 font-bold">Amount</th>
@@ -442,14 +530,29 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
               <tbody className="divide-y divide-white/5">
                 {filteredTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-8 py-16 text-center text-zinc-500">
+                    <td colSpan={6} className="px-8 py-16 text-center text-zinc-500">
                       {transactions.length === 0 ? 'No transactions found. Start by adding your first one!' : 'No transactions match your current filters.'}
                     </td>
                   </tr>
                 ) : (
                   filteredTransactions.map((t) => (
-                    <tr key={t.id} className="hover:bg-white/[0.02] transition-colors group">
-                      <td className="px-8 py-6">
+                    <tr 
+                      key={t.id} 
+                      className={cn(
+                        "transition-colors group cursor-pointer",
+                        selectedIds.includes(t.id) ? "bg-emerald-500/5" : "hover:bg-white/[0.02]"
+                      )}
+                      onClick={() => handleToggleSelect(t.id)}
+                    >
+                      <td className="px-8 py-6 w-12" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-white/10 bg-transparent text-emerald-500 focus:ring-emerald-500/50 focus:ring-offset-0 cursor-pointer"
+                          checked={selectedIds.includes(t.id)}
+                          onChange={() => handleToggleSelect(t.id)}
+                        />
+                      </td>
+                      <td className="px-4 py-6">
                         <p className="text-white font-bold text-sm">{new Date(t.date).toLocaleDateString()}</p>
                         <p className="text-zinc-500 text-[10px] font-medium uppercase tracking-wider">{new Date(t.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                       </td>
@@ -542,80 +645,112 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                  {transactions.length === 0 ? 'No transactions found.' : 'No transactions match filters.'}
               </div>
             ) : (
-              filteredTransactions.map((t) => (
-                <div key={t.id} className="p-6 flex items-center justify-between active:bg-white/[0.02] transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className={cn(
-                      "w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg",
-                      t.type === 'income' ? "bg-emerald-400/10 text-emerald-400 shadow-emerald-500/5" :
-                        t.type === 'expense' ? "bg-red-400/10 text-red-400 shadow-red-500/5" :
-                          "bg-blue-400/10 text-blue-400 shadow-blue-500/5"
-                    )}>
-                      {t.type === 'income' ? <ArrowUpRight className="w-6 h-6" /> :
-                        t.type === 'expense' ? <ArrowDownRight className="w-6 h-6" /> :
-                          <ArrowLeftRight className="w-6 h-6" />}
-                    </div>
-                    <div>
-                      <p className="text-white font-bold text-sm leading-tight">{t.note || 'No description'}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">{t.category_name || 'Misc'}</span>
-                        <span className="w-1 h-1 rounded-full bg-zinc-700" />
-                        <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">{t.from_account_name || t.to_account_name}</span>
-                      </div>
-                      <p className="text-zinc-600 text-[10px] mt-1 font-medium uppercase tracking-wider">
-                        {new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} • {new Date(t.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={cn(
-                      "font-bold text-base tracking-tight",
-                      t.type === 'income' ? "text-emerald-400" :
-                        t.type === 'expense' ? "text-red-400" :
-                          "text-blue-400"
-                    )}>
-                      {t.type === 'expense' ? '-' : t.type === 'income' ? '+' : ''}
-                      {formatCurrency(t.amount)}
-                    </p>
-                    <div className="relative">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenMenuId(openMenuId === t.id ? null : t.id);
-                        }}
-                        className="p-2 -mr-2 text-zinc-600 hover:text-white rounded-lg hover:bg-white/5 transition-all"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-                      {openMenuId === t.id && (
-                        <div
-                          onClick={e => e.stopPropagation()}
-                          className="absolute right-0 top-8 z-50 bg-[#1a1a1f] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[140px]"
-                        >
-                          <button
-                            onClick={() => handleEditTransaction(t)}
-                            className="flex items-center gap-3 w-full px-4 py-3 text-sm text-zinc-300 hover:text-white hover:bg-white/5 transition-all"
-                          >
-                            <Edit2 className="w-4 h-4 text-blue-400" />
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTransaction(t.id)}
-                            className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/5 transition-all border-t border-white/5"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
+              // Add a "Select All" toggle for mobile view exactly right above the first row
+              <>
+                <div className="px-6 py-4 flex items-center justify-between bg-white/[0.02]">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-white/10 bg-transparent text-emerald-500 focus:ring-emerald-500/50 focus:ring-offset-0 cursor-pointer"
+                      checked={filteredTransactions.length > 0 && selectedIds.length === filteredTransactions.length}
+                      onChange={handleToggleSelectAll}
+                    />
+                    <span className="text-zinc-400 text-xs font-bold uppercase tracking-widest">Select All</span>
                   </div>
                 </div>
-              ))
+                {filteredTransactions.map((t) => (
+                  <div 
+                    key={t.id} 
+                    className={cn(
+                      "p-6 flex items-center justify-between active:bg-white/[0.02] transition-colors cursor-pointer",
+                      selectedIds.includes(t.id) ? "bg-emerald-500/5" : ""
+                    )}
+                    onClick={() => handleToggleSelect(t.id)}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-white/10 bg-transparent text-emerald-500 focus:ring-emerald-500/50 focus:ring-offset-0 cursor-pointer"
+                          checked={selectedIds.includes(t.id)}
+                          onChange={() => handleToggleSelect(t.id)}
+                        />
+                      </div>
+                      <div className={cn(
+                        "w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg",
+                        t.type === 'income' ? "bg-emerald-400/10 text-emerald-400 shadow-emerald-500/5" :
+                          t.type === 'expense' ? "bg-red-400/10 text-red-400 shadow-red-500/5" :
+                            "bg-blue-400/10 text-blue-400 shadow-blue-500/5"
+                      )}>
+                        {t.type === 'income' ? <ArrowUpRight className="w-6 h-6" /> :
+                          t.type === 'expense' ? <ArrowDownRight className="w-6 h-6" /> :
+                            <ArrowLeftRight className="w-6 h-6" />}
+                      </div>
+                      <div>
+                        <p className="text-white font-bold text-sm leading-tight">{t.note || 'No description'}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">{t.category_name || 'Misc'}</span>
+                          <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                          <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">{t.from_account_name || t.to_account_name}</span>
+                        </div>
+                        <p className="text-zinc-600 text-[10px] mt-1 font-medium uppercase tracking-wider">
+                          {new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} • {new Date(t.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={cn(
+                        "font-bold text-base tracking-tight",
+                        t.type === 'income' ? "text-emerald-400" :
+                          t.type === 'expense' ? "text-red-400" :
+                            "text-blue-400"
+                      )}>
+                        {t.type === 'expense' ? '-' : t.type === 'income' ? '+' : ''}
+                        {formatCurrency(t.amount)}
+                      </p>
+                      <div className="relative">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(openMenuId === t.id ? null : t.id);
+                          }}
+                          className="p-2 -mr-2 text-zinc-600 hover:text-white rounded-lg hover:bg-white/5 transition-all"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                        {openMenuId === t.id && (
+                          <div
+                            onClick={e => e.stopPropagation()}
+                            className="absolute right-0 top-8 z-50 bg-[#1a1a1f] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[140px]"
+                          >
+                            <button
+                              onClick={() => handleEditTransaction(t)}
+                              className="flex items-center gap-3 w-full px-4 py-3 text-sm text-zinc-300 hover:text-white hover:bg-white/5 transition-all"
+                            >
+                              <Edit2 className="w-4 h-4 text-blue-400" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTransaction(t.id)}
+                              className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/5 transition-all border-t border-white/5"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </>
             )}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
 
       {/* Add Transaction Modal */}
       <AnimatePresence>
@@ -792,6 +927,3 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
           </div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
