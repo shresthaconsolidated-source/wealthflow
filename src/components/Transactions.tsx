@@ -41,6 +41,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
   const [categories, setCategories] = useState<any[]>([]);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Close action dropdown when clicking outside
   React.useEffect(() => {
@@ -66,6 +67,9 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     const payload = {
       ...formData,
       id: editingId || Math.random().toString(36).substr(2, 9),
@@ -96,10 +100,15 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
       }
     } catch (error) {
       console.error('Failed to submit transaction', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleSmartConfirm = async (data: any) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     const payload = {
       ...data,
       id: Math.random().toString(36).substr(2, 9),
@@ -117,6 +126,8 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
       }
     } catch (error) {
       console.error('Failed to submit smart transaction', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

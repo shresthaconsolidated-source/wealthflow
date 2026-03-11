@@ -57,18 +57,17 @@ export default function SmartTransactionInput({ accounts, categories, onConfirm,
   }, [input, accounts, categories]);
 
   const resolveAccount = (name?: string) =>
-    accounts.find(a => a.name?.toLowerCase() === name?.toLowerCase()) || accounts[0];
+    name ? accounts.find(a => a.name?.toLowerCase() === name?.toLowerCase()) : undefined;
 
   const resolveCategory = (keyword?: string, type?: string) => {
-    if (!keyword) return categories.filter(c => c.type === type)[0];
-    return (
-      categories.find(c => c.name?.toLowerCase().includes(keyword)) ||
-      categories.filter(c => c.type === type)[0]
+    if (!keyword) return undefined;
+    return categories.find(c =>
+      c.type === type && (c.name?.toLowerCase().includes(keyword.toLowerCase()))
     );
   };
 
   const handleConfirmParsed = async () => {
-    if (!parsed) return;
+    if (!parsed || saving) return;
 
     const fromAcc = resolveAccount(parsed.from_account_name);
     const toAcc = resolveAccount(parsed.to_account_name);
@@ -78,17 +77,18 @@ export default function SmartTransactionInput({ accounts, categories, onConfirm,
     const needCategory = parsed.type !== 'transfer' && !cat;
     const needFrom = (parsed.type === 'expense' || parsed.type === 'transfer') && !fromAcc;
     const needTo = (parsed.type === 'income' || parsed.type === 'transfer') && !toAcc;
-    const isAmbiguous = parsed.confidence === 'low' && accounts.length > 1;
+    // Ambiguous if parsed confidence is low OR if anything essential is missing
+    const isAmbiguous = parsed.confidence === 'low' || needCategory || needFrom || needTo;
 
-    if (needCategory || needFrom || needTo || isAmbiguous) {
+    if (isAmbiguous) {
       setClarifyData({
         parsed,
         resolvedCategoryId: cat?.id || '',
-        resolvedFromId: fromAcc?.id || (accounts[0]?.id ?? ''),
-        resolvedToId: toAcc?.id || (accounts[0]?.id ?? ''),
-        needCategory: needCategory || !cat,
-        needFrom: needFrom || isAmbiguous,
-        needTo: needTo || (parsed.type === 'transfer'),
+        resolvedFromId: fromAcc?.id || '',
+        resolvedToId: toAcc?.id || '',
+        needCategory,
+        needFrom,
+        needTo,
       });
       return;
     }
@@ -100,29 +100,48 @@ export default function SmartTransactionInput({ accounts, categories, onConfirm,
   };
 
   const doSave = async (data: any) => {
+    if (saving) return;
     setSaving(true);
     try {
       await onConfirm(data);
+      // Reset everything on success
       setInput('');
       setParsed(null);
       setClarifyData(null);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-    } catch { /* handled by parent */ }
-    setSaving(false);
+    } catch (e) {
+      console.error('Failed to save transaction:', e);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleClarifyConfirm = async () => {
-    if (!clarifyData) return;
-    const { parsed, resolvedCategoryId, resolvedFromId, resolvedToId } = clarifyData;
+  const handleClarifyConfirm = async (updates: Partial<typeof clarifyData>) => {
+    if (!clarifyData || saving) return;
+
+    // Merge updates into the current state
+    const newData = { ...clarifyData, ...updates };
+
+    // Check if we still need anything
+    const stillNeedCategory = newData.parsed.type !== 'transfer' && !newData.resolvedCategoryId;
+    const stillNeedFrom = (newData.parsed.type === 'expense' || newData.parsed.type === 'transfer') && !newData.resolvedFromId;
+    const stillNeedTo = (newData.parsed.type === 'income' || newData.parsed.type === 'transfer') && !newData.resolvedToId;
+
+    if (stillNeedCategory || stillNeedFrom || stillNeedTo) {
+      setClarifyData(newData);
+      return;
+    }
+
+    // If everything is resolved, save
     await doSave({
-      type: parsed.type,
-      amount: parsed.amount,
-      note: parsed.note,
-      date: parsed.date,
-      category_id: resolvedCategoryId,
-      from_account_id: resolvedFromId,
-      to_account_id: resolvedToId,
+      type: newData.parsed.type,
+      amount: newData.parsed.amount,
+      note: newData.parsed.note,
+      date: newData.parsed.date,
+      category_id: newData.resolvedCategoryId,
+      from_account_id: newData.resolvedFromId,
+      to_account_id: newData.resolvedToId,
     });
   };
 
@@ -431,75 +450,83 @@ export default function SmartTransactionInput({ accounts, categories, onConfirm,
                 </button>
               </div>
 
-              <div className="space-y-4">
-                {/* Category */}
-                {clarifyData.needCategory && clarifyData.parsed.type !== 'transfer' && (
+              <div className="space-y-6">
+                {/* Category Selection */}
+                {clarifyData.needCategory && clarifyData.parsed.type !== 'transfer' && !clarifyData.resolvedCategoryId && (
                   <div>
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">
-                      📂 Category
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 block">
+                      📂 Select Category
                     </label>
-                    <select
-                      value={clarifyData.resolvedCategoryId}
-                      onChange={e => setClarifyData(d => d ? { ...d, resolvedCategoryId: e.target.value } : d)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 [&>option]:bg-[#151518] [&>option]:text-white"
-                    >
-                      <option value="">Select category…</option>
+                    <div className="grid grid-cols-2 gap-2">
                       {categories.filter(c => c.type === clarifyData.parsed.type).map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
+                        <button
+                          key={c.id}
+                          onClick={() => handleClarifyConfirm({ resolvedCategoryId: c.id })}
+                          className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-emerald-500/30 transition-all text-left group"
+                        >
+                          <span className="w-2 h-2 rounded-full bg-emerald-500/50 group-hover:bg-emerald-500" />
+                          <span className="text-zinc-300 text-xs font-medium group-hover:text-white">{c.name}</span>
+                        </button>
                       ))}
-                    </select>
+                    </div>
                   </div>
                 )}
 
-                {/* From Account */}
-                {clarifyData.needFrom && (
+                {/* From Account Selection */}
+                {clarifyData.needFrom && !clarifyData.resolvedFromId && (
                   <div>
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">
-                      {clarifyData.parsed.type === 'income' ? '🏦 To Account' : '🏦 From Account'}
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 block">
+                      {clarifyData.parsed.type === 'income' ? '🏦 Select To Account' : '🏦 Select From Account'}
                     </label>
-                    <select
-                      value={clarifyData.resolvedFromId}
-                      onChange={e => setClarifyData(d => d ? { ...d, resolvedFromId: e.target.value } : d)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 [&>option]:bg-[#151518] [&>option]:text-white"
-                    >
-                      <option value="">Select account…</option>
+                    <div className="grid grid-cols-2 gap-2">
                       {accounts.map(a => (
-                        <option key={a.id} value={a.id}>{a.name}</option>
+                        <button
+                          key={a.id}
+                          onClick={() => handleClarifyConfirm({ resolvedFromId: a.id })}
+                          className="flex flex-col gap-0.5 px-4 py-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-emerald-500/30 transition-all text-left group"
+                        >
+                          <span className="text-zinc-300 text-xs font-bold group-hover:text-white">{a.name}</span>
+                          <span className="text-[10px] text-zinc-500">{formatCurrency(a.balance)}</span>
+                        </button>
                       ))}
-                    </select>
+                    </div>
                   </div>
                 )}
 
-                {/* To Account (transfers only) */}
-                {clarifyData.needTo && (
+                {/* To Account Selection (transfers only) */}
+                {clarifyData.needTo && !clarifyData.resolvedToId && (
                   <div>
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">
-                      {clarifyData.parsed.type === 'transfer' ? '➡️ To Account' : '🏦 Account'}
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 block">
+                      {clarifyData.parsed.type === 'transfer' ? '➡️ Select To Account' : '🏦 Select Account'}
                     </label>
-                    <select
-                      value={clarifyData.resolvedToId}
-                      onChange={e => setClarifyData(d => d ? { ...d, resolvedToId: e.target.value } : d)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 [&>option]:bg-[#151518] [&>option]:text-white"
-                    >
-                      <option value="">Select account…</option>
+                    <div className="grid grid-cols-2 gap-2">
                       {accounts.map(a => (
-                        <option key={a.id} value={a.id}>{a.name}</option>
+                        <button
+                          key={a.id}
+                          onClick={() => handleClarifyConfirm({ resolvedToId: a.id })}
+                          disabled={a.id === clarifyData.resolvedFromId}
+                          className="flex flex-col gap-0.5 px-4 py-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-emerald-500/30 transition-all text-left group disabled:opacity-20 disabled:pointer-events-none"
+                        >
+                          <span className="text-zinc-300 text-xs font-bold group-hover:text-white">{a.name}</span>
+                          <span className="text-[10px] text-zinc-500">{formatCurrency(a.balance)}</span>
+                        </button>
                       ))}
-                    </select>
+                    </div>
                   </div>
                 )}
 
-                <button
-                  onClick={handleClarifyConfirm}
-                  disabled={saving ||
-                    (clarifyData.needCategory && clarifyData.parsed.type !== 'transfer' && !clarifyData.resolvedCategoryId) ||
-                    (clarifyData.needFrom && !clarifyData.resolvedFromId) ||
-                    (clarifyData.needTo && !clarifyData.resolvedToId)
-                  }
-                  className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white font-bold rounded-2xl text-base transition-all shadow-lg shadow-emerald-500/20 mt-2"
-                >
-                  {saving ? 'Saving…' : 'Confirm & Save'}
-                </button>
+                {/* Fallback Confirm Button (only if everything is somehow already set but it still needs confirmation) */}
+                {((clarifyData.needCategory && clarifyData.resolvedCategoryId) ||
+                  (clarifyData.needFrom && clarifyData.resolvedFromId) ||
+                  (clarifyData.needTo && clarifyData.resolvedToId)) && (
+                    <button
+                      onClick={() => handleClarifyConfirm({})}
+                      disabled={saving}
+                      className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white font-bold rounded-2xl text-base transition-all shadow-lg shadow-emerald-500/20 mt-2"
+                    >
+                      {saving ? 'Saving…' : 'Confirm & Save'}
+                    </button>
+                  )}
               </div>
             </motion.div>
           </>
