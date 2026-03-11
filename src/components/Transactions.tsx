@@ -43,9 +43,27 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Close action dropdown when clicking outside
+  // Search & Filters State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFiltersMenu, setShowFiltersMenu] = useState(false);
+  const [showDateMenu, setShowDateMenu] = useState(false);
+  
+  const [filterType, setFilterType] = useState<'all' | 'expense' | 'income' | 'transfer'>('all');
+  const [filterCategoryId, setFilterCategoryId] = useState<string>('all');
+  const [filterAccountId, setFilterAccountId] = useState<string>('all');
+  
+  const [dateStart, setDateStart] = useState('');
+  const [dateEnd, setDateEnd] = useState('');
+
+  // Close action dropdowns when clicking outside
   React.useEffect(() => {
-    const close = () => setOpenMenuId(null);
+    const close = (e: MouseEvent) => {
+      // Don't close if clicking inside a dropdown
+      if ((e.target as Element).closest('.filter-dropdown')) return;
+      setOpenMenuId(null);
+      setShowFiltersMenu(false);
+      setShowDateMenu(false);
+    };
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
   }, []);
@@ -181,6 +199,56 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
     }
   };
 
+  // Compute filtered transactions
+  const filteredTransactions = React.useMemo(() => {
+    return transactions.filter(t => {
+      // 1. Search Query
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesNote = t.note?.toLowerCase().includes(query);
+        const matchesCategory = t.category_name?.toLowerCase().includes(query);
+        const matchesAccount = t.from_account_name?.toLowerCase().includes(query) || t.to_account_name?.toLowerCase().includes(query);
+        const matchesAmount = t.amount?.toString().includes(query);
+        if (!matchesNote && !matchesCategory && !matchesAccount && !matchesAmount) return false;
+      }
+
+      // 2. Type Filter
+      if (filterType !== 'all' && t.type !== filterType) return false;
+
+      // 3. Category Filter
+      if (filterCategoryId !== 'all' && t.category_id !== filterCategoryId) return false;
+
+      // 4. Account Filter
+      if (filterAccountId !== 'all') {
+        if (t.from_account_id !== filterAccountId && t.to_account_id !== filterAccountId) return false;
+      }
+
+      // 5. Date Range Filter
+      if (dateStart) {
+        const tDate = new Date(t.date).getTime();
+        const sDate = new Date(dateStart).getTime();
+        if (tDate < sDate) return false;
+      }
+      if (dateEnd) {
+        // Add 1 day to end date to make it inclusive of the end day
+        const tDate = new Date(t.date).getTime();
+        const eDate = new Date(dateEnd).getTime() + 86400000;
+        if (tDate >= eDate) return false;
+      }
+
+      return true;
+    });
+  }, [transactions, searchQuery, filterType, filterCategoryId, filterAccountId, dateStart, dateEnd]);
+
+  const hasActiveFilters = filterType !== 'all' || filterCategoryId !== 'all' || filterAccountId !== 'all' || dateStart || dateEnd;
+  const clearFilters = () => {
+    setFilterType('all');
+    setFilterCategoryId('all');
+    setFilterAccountId('all');
+    setDateStart('');
+    setDateEnd('');
+  };
+
   return (
     <div className="space-y-6 lg:space-y-8 max-w-7xl mx-auto pb-12 lg:pb-0">
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-6">
@@ -209,24 +277,151 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
 
       {/* Filters & History */}
       <div className="space-y-4">
-        <div className="flex flex-col md:flex-row gap-3 justify-between items-center">
+        <div className="flex flex-col md:flex-row gap-3 justify-between items-center z-20 relative">
           <div className="relative w-full md:w-96">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
             <input
               type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search transactions..."
               className="w-full bg-[#151518] border border-white/5 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm"
             />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
-          <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
-            <button className="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-white/5 bg-[#151518] text-zinc-400 hover:text-white hover:bg-white/5 transition-all text-xs font-bold uppercase tracking-widest">
-              <Filter className="w-4 h-4" />
-              <span>Filters</span>
-            </button>
-            <button className="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-white/5 bg-[#151518] text-zinc-400 hover:text-white hover:bg-white/5 transition-all text-xs font-bold uppercase tracking-widest">
-              <Calendar className="w-4 h-4" />
-              <span>Date Range</span>
-            </button>
+          <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0 relative filter-dropdown">
+            {hasActiveFilters && (
+              <button 
+                onClick={clearFilters}
+                className="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all text-xs font-bold uppercase tracking-widest"
+              >
+                Clear
+              </button>
+            )}
+
+            {/* Filters Button & Dropdown */}
+            <div className="relative inline-block">
+              <button 
+                onClick={(e) => { e.stopPropagation(); setShowFiltersMenu(!showFiltersMenu); setShowDateMenu(false); }}
+                className={cn(
+                  "flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all text-xs font-bold uppercase tracking-widest",
+                  (filterType !== 'all' || filterCategoryId !== 'all' || filterAccountId !== 'all') 
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" 
+                    : "border-white/5 bg-[#151518] text-zinc-400 hover:text-white hover:bg-white/5"
+                )}
+              >
+                <Filter className="w-4 h-4" />
+                <span>Filters</span>
+              </button>
+              
+              <AnimatePresence>
+                {showFiltersMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute right-0 md:right-auto md:left-0 top-full mt-2 w-72 bg-[#1a1a1f] border border-white/10 rounded-2xl shadow-2xl z-50 p-4 space-y-4 filter-dropdown"
+                  >
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Type</label>
+                      <select 
+                        value={filterType} 
+                        onChange={e => setFilterType(e.target.value as any)}
+                        className="w-full bg-[#151518] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none"
+                      >
+                        <option value="all">All Types</option>
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                        <option value="transfer">Transfer</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Category</label>
+                      <select 
+                        value={filterCategoryId} 
+                        onChange={e => setFilterCategoryId(e.target.value)}
+                        className="w-full bg-[#151518] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none"
+                      >
+                        <option value="all">All Categories</option>
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Account</label>
+                      <select 
+                        value={filterAccountId} 
+                        onChange={e => setFilterAccountId(e.target.value)}
+                        className="w-full bg-[#151518] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none"
+                      >
+                        <option value="all">All Accounts</option>
+                        {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Date Range Button & Dropdown */}
+            <div className="relative inline-block">
+              <button 
+                onClick={(e) => { e.stopPropagation(); setShowDateMenu(!showDateMenu); setShowFiltersMenu(false); }}
+                className={cn(
+                  "flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all text-xs font-bold uppercase tracking-widest",
+                  (dateStart || dateEnd) 
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" 
+                    : "border-white/5 bg-[#151518] text-zinc-400 hover:text-white hover:bg-white/5"
+                )}
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Date Range</span>
+              </button>
+
+              <AnimatePresence>
+                {showDateMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute right-0 top-full mt-2 w-64 bg-[#1a1a1f] border border-white/10 rounded-2xl shadow-2xl z-50 p-4 space-y-4 filter-dropdown"
+                  >
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Start Date</label>
+                      <input 
+                        type="date" 
+                        value={dateStart}
+                        onChange={e => setDateStart(e.target.value)}
+                        className="w-full bg-[#151518] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">End Date</label>
+                      <input 
+                        type="date" 
+                        value={dateEnd}
+                        onChange={e => setDateEnd(e.target.value)}
+                        className="w-full bg-[#151518] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                       <button 
+                        onClick={() => { setDateStart(''); setDateEnd(''); }}
+                        className="flex-1 py-2 rounded-lg bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 text-xs font-bold transition-all"
+                       >
+                         Clear
+                       </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
 
@@ -245,14 +440,14 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {transactions.length === 0 ? (
+                {filteredTransactions.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-8 py-16 text-center text-zinc-500">
-                      No transactions found. Start by adding your first one!
+                      {transactions.length === 0 ? 'No transactions found. Start by adding your first one!' : 'No transactions match your current filters.'}
                     </td>
                   </tr>
                 ) : (
-                  transactions.map((t) => (
+                  filteredTransactions.map((t) => (
                     <tr key={t.id} className="hover:bg-white/[0.02] transition-colors group">
                       <td className="px-8 py-6">
                         <p className="text-white font-bold text-sm">{new Date(t.date).toLocaleDateString()}</p>
@@ -342,12 +537,12 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
 
           {/* Mobile Card View */}
           <div className="lg:hidden divide-y divide-white/5">
-            {transactions.length === 0 ? (
+            {filteredTransactions.length === 0 ? (
               <div className="px-6 py-16 text-center text-zinc-500">
-                No transactions found.
+                 {transactions.length === 0 ? 'No transactions found.' : 'No transactions match filters.'}
               </div>
             ) : (
-              transactions.map((t) => (
+              filteredTransactions.map((t) => (
                 <div key={t.id} className="p-6 flex items-center justify-between active:bg-white/[0.02] transition-colors">
                   <div className="flex items-center gap-4">
                     <div className={cn(
