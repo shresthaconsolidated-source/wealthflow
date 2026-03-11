@@ -296,7 +296,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
               </button>
             )}
           </div>
-          <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0 relative filter-dropdown">
+          <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0 relative filter-dropdown z-30">
             {hasActiveFilters && (
               <button 
                 onClick={clearFilters}
