@@ -288,15 +288,21 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                         </p>
                       </td>
                       <td className="px-8 py-6 text-right">
-                        <div className="relative" onClick={e => e.stopPropagation()}>
+                        <div className="relative">
                           <button
-                            onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(openMenuId === t.id ? null : t.id);
+                            }}
                             className="p-3 rounded-xl hover:bg-white/5 text-zinc-500 hover:text-white transition-all"
                           >
                             <MoreVertical className="w-5 h-5" />
                           </button>
                           {openMenuId === t.id && (
-                            <div className="absolute right-0 top-12 z-50 bg-[#1a1a1f] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[140px]">
+                            <div
+                              onClick={e => e.stopPropagation()}
+                              className="absolute right-0 top-12 z-50 bg-[#1a1a1f] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[140px]"
+                            >
                               <button
                                 onClick={() => handleEditTransaction(t)}
                                 className="flex items-center gap-3 w-full px-4 py-3 text-sm text-zinc-300 hover:text-white hover:bg-white/5 transition-all"
@@ -366,13 +372,19 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                     </p>
                     <div className="relative">
                       <button
-                        onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(openMenuId === t.id ? null : t.id);
+                        }}
                         className="p-2 -mr-2 text-zinc-600 hover:text-white rounded-lg hover:bg-white/5 transition-all"
                       >
                         <MoreVertical className="w-4 h-4" />
                       </button>
                       {openMenuId === t.id && (
-                        <div className="absolute right-0 top-8 z-50 bg-[#1a1a1f] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[140px]">
+                        <div
+                          onClick={e => e.stopPropagation()}
+                          className="absolute right-0 top-8 z-50 bg-[#1a1a1f] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[140px]"
+                        >
                           <button
                             onClick={() => handleEditTransaction(t)}
                             className="flex items-center gap-3 w-full px-4 py-3 text-sm text-zinc-300 hover:text-white hover:bg-white/5 transition-all"
