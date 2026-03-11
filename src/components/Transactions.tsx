@@ -748,9 +748,6 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
 
       {/* Add Transaction Modal */}
       <AnimatePresence>
@@ -927,3 +924,6 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
           </div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
