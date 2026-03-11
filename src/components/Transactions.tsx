@@ -54,6 +54,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
   
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
+  const [filterCurrentMonth, setFilterCurrentMonth] = useState(true);
 
   // Bulk Action State
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -89,6 +90,10 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
 
   // Compute filtered transactions
   const filteredTransactions = React.useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
     return transactions.filter(t => {
       // 1. Search Query
       if (searchQuery) {
@@ -111,7 +116,15 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
         if (t.from_account_id !== filterAccountId && t.to_account_id !== filterAccountId) return false;
       }
 
-      // 5. Date Range Filter
+      // 5. Current Month Filter
+      if (filterCurrentMonth && !dateStart && !dateEnd) {
+        const tDate = new Date(t.date);
+        if (tDate.getFullYear() !== currentYear || tDate.getMonth() !== currentMonth) {
+          return false;
+        }
+      }
+
+      // 6. Date Range Filter
       if (dateStart) {
         const tDate = new Date(t.date).getTime();
         const sDate = new Date(dateStart).getTime();
@@ -126,7 +139,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
 
       return true;
     });
-  }, [transactions, searchQuery, filterType, filterCategoryId, filterAccountId, dateStart, dateEnd]);
+  }, [transactions, searchQuery, filterType, filterCategoryId, filterAccountId, dateStart, dateEnd, filterCurrentMonth]);
 
   // Bulk selection handlers
   const handleToggleSelect = (id: string) => {
@@ -288,13 +301,15 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
     }
   };
 
-  const hasActiveFilters = filterType !== 'all' || filterCategoryId !== 'all' || filterAccountId !== 'all' || dateStart || dateEnd;
+  const hasActiveFilters = filterType !== 'all' || filterCategoryId !== 'all' || filterAccountId !== 'all' || dateStart || dateEnd || !filterCurrentMonth;
   const clearFilters = () => {
     setFilterType('all');
     setFilterCategoryId('all');
     setFilterAccountId('all');
     setDateStart('');
     setDateEnd('');
+    // Clear actually means we want to see ALL data, so we turn OFF the current month filter
+    setFilterCurrentMonth(false);
   };
 
   return (
@@ -384,6 +399,30 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                 Clear
               </button>
             )}
+
+            {/* Current Month Toggle Button */}
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                if (!filterCurrentMonth) {
+                  // If turning ON, clear any custom date range that conflicts
+                  setDateStart('');
+                  setDateEnd('');
+                }
+                setFilterCurrentMonth(!filterCurrentMonth); 
+                setShowFiltersMenu(false); 
+                setShowDateMenu(false); 
+              }}
+              className={cn(
+                "flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all text-xs font-bold uppercase tracking-widest relative z-50",
+                filterCurrentMonth 
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)]" 
+                  : "border-white/5 bg-[#151518] text-zinc-400 hover:text-white hover:bg-white/5"
+              )}
+            >
+              <Calendar className="w-4 h-4 pointer-events-none" />
+              <span className="pointer-events-none">Current Month</span>
+            </button>
 
             {/* Filters Button & Dropdown */}
             <div className="relative inline-block z-40">
@@ -476,7 +515,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                       <input 
                         type="date" 
                         value={dateStart}
-                        onChange={e => setDateStart(e.target.value)}
+                        onChange={e => { setDateStart(e.target.value); setFilterCurrentMonth(false); }}
                         className="w-full bg-[#151518] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none"
                       />
                     </div>
@@ -485,7 +524,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                       <input 
                         type="date" 
                         value={dateEnd}
-                        onChange={e => setDateEnd(e.target.value)}
+                        onChange={e => { setDateEnd(e.target.value); setFilterCurrentMonth(false); }}
                         className="w-full bg-[#151518] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none"
                       />
                     </div>
