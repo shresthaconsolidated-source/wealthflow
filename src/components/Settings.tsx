@@ -11,7 +11,13 @@ import {
   Building,
   TrendingUp,
   TrendingDown,
-  ShieldAlert
+  ShieldAlert,
+  Download,
+  Upload,
+  FileSpreadsheet,
+  AlertCircle,
+  CheckCircle2,
+  RefreshCw
 } from 'lucide-react';
 import { formatCurrency, cn, getCurrencySymbol } from '@/src/lib/utils';
 import { useApi } from '@/src/hooks/useApi';
@@ -148,6 +154,102 @@ export default function Settings() {
     } catch (error) {
       console.error('Failed to save currency setting:', error);
       showError('Failed to save currency preference to the server.');
+    }
+  };
+
+  const [importing, setImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error', message: string, details?: string[] } | null>(null);
+
+  const handleExport = async () => {
+    try {
+      const res = await fetchWithAuth('/api/transactions/export');
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'transactions_export.csv';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        showError('Export failed. Please check your connection.');
+      }
+    } catch (e) {
+      console.error('Export error:', e);
+      showError('Export failed due to a network error.');
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>, isTransfer: boolean = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    setImportStatus(null);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split('\n');
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      const rows = lines.slice(1).filter(l => l.trim()).map(line => {
+        const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const obj: any = {};
+        headers.forEach((header, index) => {
+          obj[header] = values[index];
+        });
+        return obj;
+      });
+
+      try {
+        const endpoint = isTransfer ? '/api/transactions/import/transfers' : '/api/transactions/import/standard';
+        const res = await fetchWithAuth(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows })
+        });
+
+        const result = await res.json();
+        if (res.ok) {
+          setImportStatus({
+            type: 'success',
+            message: `Successfully imported ${result.imported} of ${result.total} ${isTransfer ? 'transfers' : 'transactions'}.`
+          });
+          fetchData();
+        } else {
+          setImportStatus({
+            type: 'error',
+            message: result.error || 'Import failed.',
+            details: result.details
+          });
+        }
+      } catch (err: any) {
+        setImportStatus({ type: 'error', message: 'Network error during import.' });
+      } finally {
+        setImporting(false);
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDownloadTemplate = async (isTransfer: boolean = false) => {
+    try {
+      const endpoint = isTransfer ? '/api/transactions/template/transfers' : '/api/transactions/template/standard';
+      const res = await fetchWithAuth(endpoint);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = isTransfer ? 'transfers_template.csv' : 'standard_transactions_template.csv';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      console.error('Template error:', e);
     }
   };
 
@@ -379,17 +481,123 @@ export default function Settings() {
                 <option value="NPR">NPR (रू)</option>
               </select>
             </div>
+            
             <div className="p-8 rounded-3xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/10 flex flex-col justify-between gap-6">
               <div>
-                <p className="text-white font-bold text-base">Data & Privacy</p>
-                <p className="text-zinc-500 text-sm mt-2">Manage how your financial data is stored securely in your private cloud.</p>
+                <p className="text-white font-bold text-base">Standard Transactions</p>
+                <p className="text-zinc-500 text-sm mt-2">Import Income and Expenses using a simple CSV template.</p>
               </div>
-              <button className="text-emerald-400 font-bold text-xs uppercase tracking-widest flex items-center gap-2 hover:text-emerald-300 transition-colors w-fit p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
-                View Privacy Policy <ChevronRight className="w-4 h-4" />
-              </button>
+              <div className="flex flex-wrap gap-4">
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => handleImport(e, false)}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    disabled={importing}
+                  />
+                  <button 
+                    disabled={importing}
+                    className="px-6 py-3 rounded-2xl bg-white/5 border border-white/10 text-white text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-white/10 transition-colors disabled:opacity-50"
+                  >
+                    {importing ? <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" /> : <Upload className="w-4 h-4 text-emerald-400" />}
+                    {importing ? 'Importing...' : 'Import CSV'}
+                  </button>
+                </div>
+                <button 
+                  onClick={() => handleDownloadTemplate(false)}
+                  className="px-6 py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-500/20 transition-colors"
+                >
+                  <FileSpreadsheet className="w-4 h-4" /> Template
+                </button>
+              </div>
+            </div>
+
+            <div className="p-8 rounded-3xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/10 flex flex-col justify-between gap-6">
+              <div>
+                <p className="text-white font-bold text-base">Internal Transfers</p>
+                <p className="text-zinc-500 text-sm mt-2">Move funds between your existing Bank, Cash or Asset accounts.</p>
+              </div>
+              <div className="flex flex-wrap gap-4">
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => handleImport(e, true)}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    disabled={importing}
+                  />
+                  <button 
+                    disabled={importing}
+                    className="px-6 py-3 rounded-2xl bg-white/5 border border-white/10 text-white text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-white/10 transition-colors disabled:opacity-50"
+                  >
+                    {importing ? <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" /> : <Upload className="w-4 h-4 text-indigo-400" />}
+                    {importing ? 'Importing...' : 'Import CSV'}
+                  </button>
+                </div>
+                <button 
+                  onClick={() => handleDownloadTemplate(true)}
+                  className="px-6 py-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-500/20 transition-colors"
+                >
+                  <FileSpreadsheet className="w-4 h-4" /> Template
+                </button>
+              </div>
+            </div>
+
+            <div className="p-8 rounded-3xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/10 flex flex-col justify-between gap-6 md:col-span-2">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-white font-bold text-base">Full Data Export</p>
+                  <p className="text-zinc-500 text-sm mt-2">Download all your transaction history for backup or external analysis.</p>
+                </div>
+                <button 
+                  onClick={handleExport}
+                  className="px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-white text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-white/10 transition-colors"
+                >
+                  <Download className="w-5 h-5 text-blue-400" /> Export All Data
+                </button>
+              </div>
             </div>
           </div>
         </div>
+
+        {importStatus && (
+          <div className="pt-8 relative z-10 animate-in fade-in slide-in-from-bottom duration-300">
+            <div className={cn(
+              "p-8 rounded-[32px] border flex gap-6",
+              importStatus.type === 'success' ? "bg-emerald-500/5 border-emerald-500/20" : "bg-red-500/5 border-red-500/20"
+            )}>
+              <div className={cn(
+                "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0",
+                importStatus.type === 'success' ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
+              )}>
+                {importStatus.type === 'success' ? <CheckCircle2 className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
+              </div>
+              <div className="space-y-2">
+                <p className={cn("font-bold", importStatus.type === 'success' ? "text-emerald-400" : "text-red-400")}>
+                  {importStatus.message}
+                </p>
+                {importStatus.details && importStatus.details.length > 0 && (
+                  <div className="mt-4 p-4 rounded-2xl bg-black/40 border border-white/5 max-h-48 overflow-y-auto">
+                    <ul className="space-y-2">
+                      {importStatus.details.map((detail, idx) => (
+                        <li key={idx} className="text-zinc-500 text-xs flex gap-2">
+                          <span className="text-red-400 shrink-0">•</span> {detail}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <button 
+                  onClick={() => setImportStatus(null)}
+                  className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest hover:text-white transition-colors pt-2"
+                >
+                  Dismiss Status
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {showAddModal && (

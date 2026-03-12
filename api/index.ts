@@ -408,49 +408,215 @@ app.delete(["/api/transactions/:id", "/transactions/:id"], async (req, res) => {
   res.json({ success: true });
 });
 
-app.get(["/api/user/settings", "/user/settings"], asyncHandler(async (req: any, res: any) => {
-  const userId = (req as any).user.id;
-  try {
-    const { data, error } = await supabase
-      .from('user_settings')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
+// Export transactions as CSV
+app.get(["/api/transactions/export", "/transactions/export"], asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.id;
+  
+  const { data, error } = await supabase
+    .from('transactions')
+    .select(`
+      date,
+      type,
+      amount,
+      note,
+      from_account:accounts!from_account_id(name),
+      to_account:accounts!to_account_id(name),
+      categories(name)
+    `)
+    .eq('user_id', userId)
+    .order('date', { ascending: false });
 
-    if (error) {
-      console.error("Error fetching user settings:", error);
-      return res.status(500).json({ error: error.message });
-    }
+  if (error) return res.status(500).json({ error: error.message });
 
-    res.json(data || { base_currency: 'USD' });
-  } catch (err: any) {
-    console.error("Unexpected error fetching user settings:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
+  const headers = ['Date', 'Type', 'Amount', 'From Account', 'To Account', 'Category', 'Note'];
+  const rows = (data || []).map(t => [
+    t.date,
+    t.type,
+    t.amount,
+    (t.from_account as any)?.name || '',
+    (t.to_account as any)?.name || '',
+    (t.categories as any)?.name || '',
+    t.note || ''
+  ]);
+
+  const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+  
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=transactions_export.csv');
+  res.status(200).send(csvContent);
 }));
 
-app.post(["/api/user/settings", "/user/settings"], asyncHandler(async (req: any, res: any) => {
-  const userId = (req as any).user.id;
-  const { base_currency } = req.body;
+// Download CSV Template for Standard Transactions
+app.get(["/api/transactions/template/standard", "/transactions/template/standard"], (req, res) => {
+  const headers = ['Date', 'Description', 'Type', 'Category', 'Account', 'Amount'];
+  const exampleRow = ['2026-03-12', 'Weekly Groceries', 'expense', 'Groceries & Dining', 'Main Bank', '75.50'];
+  const csvContent = [headers, exampleRow].map(row => row.join(',')).join('\n');
 
-  if (!base_currency) {
-    return res.status(400).json({ error: "base_currency is required" });
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=standard_transactions_template.csv');
+  res.status(200).send(csvContent);
+});
+
+// Download CSV Template for Transfers
+app.get(["/api/transactions/template/transfers", "/transactions/template/transfers"], (req, res) => {
+  const headers = ['Date', 'Description', 'From Account', 'To Account', 'Amount'];
+  const exampleRow = ['2026-03-12', 'ATM Withdrawal', 'Main Bank', 'Petty Cash', '200.00'];
+  const csvContent = [headers, exampleRow].map(row => row.join(',')).join('\n');
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=transfers_template.csv');
+  res.status(200).send(csvContent);
+});
+
+// Import Standard Transactions (Income/Expense)
+app.post(["/api/transactions/import/standard", "/transactions/import/standard"], asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.id;
+  const { rows } = req.body;
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ error: "No data provided." });
   }
 
-  try {
-    const { error } = await supabase
-      .from('user_settings')
-      .upsert({ user_id: userId, base_currency }, { onConflict: 'user_id' });
+  const [{ data: accounts }, { data: categories }] = await Promise.all([
+    supabase.from('accounts').select('id, name').eq('user_id', userId),
+    supabase.from('categories').select('id, name').eq('user_id', userId)
+  ]);
 
-    if (error) {
-      console.error("Error saving user settings:", error);
-      return res.status(500).json({ error: error.message });
+  const accountMap = new Map((accounts || []).map(a => [a.name.toLowerCase(), a.id]));
+  const categoryMap = new Map((categories || []).map(c => [c.name.toLowerCase(), c.id]));
+
+  const imports = [];
+  const errors = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const date = row.Date || row[0];
+    const description = row.Description || row[1] || '';
+    const type = (row.Type || row[2] || '').toLowerCase();
+    const catName = (row.Category || row[3] || '').trim().toLowerCase();
+    const accName = (row.Account || row[4] || '').trim().toLowerCase();
+    const amount = parseFloat(row.Amount || row[5] || '0');
+
+    if (!date || !type || isNaN(amount) || !accName) {
+      errors.push(`Row ${i + 1}: Missing Date, Type, Account, or valid Amount.`);
+      continue;
     }
-    res.json({ success: true });
-  } catch (err: any) {
-    console.error("Unexpected error saving user settings:", err);
-    res.status(500).json({ error: "Internal server error" });
+
+    if (!['income', 'expense'].includes(type)) {
+      errors.push(`Row ${i + 1}: Type must be 'income' or 'expense'. Got '${type}'.`);
+      continue;
+    }
+
+    const account_id = accountMap.get(accName);
+    const category_id = catName ? categoryMap.get(catName) : null;
+
+    if (!account_id) {
+      errors.push(`Row ${i + 1}: Account "${row.Account || row[4]}" not found in Settings.`);
+      continue;
+    }
+    if (catName && !category_id) {
+      errors.push(`Row ${i + 1}: Category "${row.Category || row[3]}" not found in Settings.`);
+      continue;
+    }
+
+    imports.push({
+      user_id: userId,
+      date,
+      type,
+      amount,
+      note: description,
+      from_account_id: type === 'expense' ? account_id : null,
+      to_account_id: type === 'income' ? account_id : null,
+      category_id,
+      id: 'tx-' + Math.random().toString(36).substr(2, 9)
+    });
   }
+
+  if (errors.length > 0) return res.status(400).json({ error: "Validation failed", details: errors });
+
+  let successCount = 0;
+  for (const tx of imports) {
+    const { error } = await supabase.from('transactions').insert(tx);
+    if (!error) {
+      successCount++;
+      try {
+        const accId = tx.type === 'income' ? tx.to_account_id! : tx.from_account_id!;
+        const { data } = await supabase.from('accounts').select('balance').eq('id', accId).single();
+        if (data) {
+          const newBalance = tx.type === 'income' ? Number(data.balance) + tx.amount : Number(data.balance) - tx.amount;
+          await supabase.from('accounts').update({ balance: newBalance }).eq('id', accId);
+        }
+      } catch (e) { console.error('Balance update error', e); }
+    }
+  }
+
+  res.json({ success: true, imported: successCount, total: imports.length });
+}));
+
+// Import Transfers
+app.post(["/api/transactions/import/transfers", "/transactions/import/transfers"], asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.id;
+  const { rows } = req.body;
+
+  if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: "No data." });
+
+  const { data: accounts } = await supabase.from('accounts').select('id, name').eq('user_id', userId);
+  const accountMap = new Map((accounts || []).map(a => [a.name.toLowerCase(), a.id]));
+
+  const imports = [];
+  const errors = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const date = row.Date || row[0];
+    const description = row.Description || row[1] || '';
+    const fromAccName = (row['From Account'] || row[2] || '').trim().toLowerCase();
+    const toAccName = (row['To Account'] || row[3] || '').trim().toLowerCase();
+    const amount = parseFloat(row.Amount || row[4] || '0');
+
+    if (!date || !fromAccName || !toAccName || isNaN(amount)) {
+      errors.push(`Row ${i + 1}: Missing Date, From Account, To Account, or valid Amount.`);
+      continue;
+    }
+
+    const from_id = accountMap.get(fromAccName);
+    const to_id = accountMap.get(toAccName);
+
+    if (!from_id) errors.push(`Row ${i + 1}: From Account "${row['From Account'] || row[2]}" not found.`);
+    if (!to_id) errors.push(`Row ${i + 1}: To Account "${row['To Account'] || row[3]}" not found.`);
+
+    if (!from_id || !to_id) continue;
+
+    imports.push({
+      user_id: userId,
+      date,
+      type: 'transfer',
+      amount,
+      note: description,
+      from_account_id: from_id,
+      to_account_id: to_id,
+      category_id: null,
+      id: 'tx-' + Math.random().toString(36).substr(2, 9)
+    });
+  }
+
+  if (errors.length > 0) return res.status(400).json({ error: "Validation failed", details: errors });
+
+  let successCount = 0;
+  for (const tx of imports) {
+    const { error } = await supabase.from('transactions').insert(tx);
+    if (!error) {
+      successCount++;
+      try {
+        let { data: fD } = await supabase.from('accounts').select('balance').eq('id', tx.from_account_id).single();
+        if (fD) await supabase.from('accounts').update({ balance: Number(fD.balance) - tx.amount }).eq('id', tx.from_account_id);
+        let { data: tD } = await supabase.from('accounts').select('balance').eq('id', tx.to_account_id).single();
+        if (tD) await supabase.from('accounts').update({ balance: Number(tD.balance) + tx.amount }).eq('id', tx.to_account_id);
+      } catch (e) { console.error('Balance update error', e); }
+    }
+  }
+
+  res.json({ success: true, imported: successCount, total: imports.length });
 }));
 
 // Global error handler (must be last)
