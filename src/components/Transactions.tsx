@@ -21,6 +21,30 @@ import { useApi } from '@/src/hooks/useApi';
 
 import SmartTransactionInput from '@/src/components/SmartTransactionInput';
 
+const getLocalDatetimePattern = (dateStr?: string | null) => {
+  if (!dateStr) {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  }
+  if (dateStr.length === 16 && dateStr.includes('T')) return dateStr;
+  if (dateStr.length === 10 && !dateStr.includes('T')) return `${dateStr}T00:00`;
+  
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  }
+  
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T${hh}:${mins}`;
+};
+
 interface TransactionsProps {
   setActiveTab: (tab: string) => void;
 }
@@ -31,7 +55,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
   const [activeType, setActiveType] = useState<'expense' | 'income' | 'transfer'>('expense');
   const [formData, setFormData] = useState({
     amount: '',
-    date: new Date().toISOString().slice(0, 16),
+    date: getLocalDatetimePattern(),
     note: '',
     category_id: '',
     from_account_id: '',
@@ -254,7 +278,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
     if (data) {
       setFormData({
         amount: data.amount?.toString() || '',
-        date: data.date || new Date().toISOString().slice(0, 16),
+        date: getLocalDatetimePattern(data.date),
         note: data.note || '',
         category_id: data.category_id || '',
         from_account_id: data.from_account_id || '',
@@ -263,7 +287,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
     } else {
       setFormData({
         amount: '',
-        date: new Date().toISOString().slice(0, 16),
+        date: getLocalDatetimePattern(),
         note: '',
         category_id: '',
         from_account_id: '',
@@ -279,7 +303,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
     setActiveType(t.type);
     setFormData({
       amount: t.amount?.toString() || '',
-      date: t.date ? t.date.slice(0, 16) : new Date().toISOString().slice(0, 16),
+      date: getLocalDatetimePattern(t.date),
       note: t.note || '',
       category_id: t.category_id || '',
       from_account_id: t.from_account_id || '',
