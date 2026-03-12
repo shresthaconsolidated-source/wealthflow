@@ -6,7 +6,12 @@ import {
   PieChart as PieChartIcon,
   ArrowUpRight,
   ArrowDownRight,
-  Plus
+  Plus,
+  Wallet,
+  CreditCard,
+  Briefcase,
+  X,
+  ChevronRight
 } from 'lucide-react';
 import {
   AreaChart,
@@ -23,7 +28,7 @@ import {
   Pie
 } from 'recharts';
 import { formatCurrency, cn, getCurrencySymbol } from '@/src/lib/utils';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useApi } from '@/src/hooks/useApi';
 import InsightCards from './InsightCards';
 import HealthScoreCard from './HealthScoreCard';
@@ -42,6 +47,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
   const [data, setData] = useState<any>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [chartRange, setChartRange] = useState<number>(6);
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const { fetchWithAuth } = useApi();
 
   const [history, setHistory] = useState<any[]>([]);
@@ -49,45 +55,83 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
   useEffect(() => {
     fetchWithAuth(`/api/dashboard?month=${selectedMonth}`)
       .then(res => res.json())
-      .then(setData)
-      .catch(console.error);
+      .then(d => {
+        console.log('Dashboard Data:', d);
+        setData(d);
+      })
+      .catch(err => {
+        console.error('Error fetching dashboard data:', err);
+      });
   }, [selectedMonth, fetchWithAuth]);
 
   useEffect(() => {
     fetchWithAuth('/api/dashboard/history?months=12')
       .then(res => res.json())
       .then(setHistory)
-      .catch(console.error);
+      .catch(err => {
+        console.error('Error fetching history:', err);
+      });
   }, [fetchWithAuth]);
+
+  const accounts = data?.accounts || [];
+
+  // Robust Grouping Logic
+  const groupedAccounts = React.useMemo(() => {
+    const groups: Record<string, { label: string, icon: any, color: string, total: number, accounts: any[] }> = {
+      bank: { label: 'Bank', icon: CreditCard, color: 'blue-400', total: 0, accounts: [] },
+      cash: { label: 'Cash', icon: Wallet, color: 'emerald-400', total: 0, accounts: [] },
+      asset: { label: 'Assets', icon: Briefcase, color: 'amber-400', total: 0, accounts: [] },
+    };
+
+    try {
+      accounts.forEach((acc: any) => {
+        const type = String(acc.type || 'asset').toLowerCase();
+        const targetGroup = groups[type] || groups.asset;
+        targetGroup.total += Number(acc.balance || 0);
+        targetGroup.accounts.push(acc);
+      });
+    } catch (e) {
+      console.error('Error grouping accounts:', e);
+    }
+
+    return Object.entries(groups)
+      .filter(([_, g]) => g.accounts.length > 0)
+      .sort((a, b) => b[1].total - a[1].total);
+  }, [accounts]);
 
   if (!data) return <div className="p-8 text-zinc-500">Loading dashboard...</div>;
 
+  // Defensive calculations
+  const totalNetWorth = Number(data.totalNetWorth || 0);
+  const monthlyIncome = Number(data.monthlyIncome || 0);
+  const monthlyExpense = Number(data.monthlyExpense || 0);
+  const savingsRate = Number(data.savingsRate || 0);
+
   const kpis = [
-    { label: 'Total Net Worth', value: data.totalNetWorth, icon: DollarSign, trend: data.totalNetWorth > 0 ? '+Active' : 'Empty', positive: data.totalNetWorth >= 0 },
-    { label: 'Monthly Income', value: data.monthlyIncome, icon: TrendingUp, trend: 'This Month', positive: true },
-    { label: 'Monthly Expense', value: data.monthlyExpense, icon: TrendingDown, trend: 'This Month', positive: data.monthlyExpense === 0 },
-    { label: 'Savings Rate', value: `${data.savingsRate.toFixed(1)}%`, icon: PieChartIcon, trend: 'This Month', positive: data.savingsRate >= 0 },
+    { label: 'Total Net Worth', value: totalNetWorth, icon: DollarSign, trend: totalNetWorth > 0 ? '+Active' : 'Empty', positive: totalNetWorth >= 0 },
+    { label: 'Monthly Income', value: monthlyIncome, icon: TrendingUp, trend: 'This Month', positive: true },
+    { label: 'Monthly Expense', value: monthlyExpense, icon: TrendingDown, trend: 'This Month', positive: monthlyExpense === 0 },
+    { label: 'Savings Rate', value: `${savingsRate.toFixed(1)}%`, icon: PieChartIcon, trend: 'This Month', positive: savingsRate >= 0 },
   ];
 
   const currentMonthLabel = new Date(selectedMonth + '-01').toLocaleString('default', { month: 'short' });
 
-  const chartData = history.slice(-chartRange).map((h) => ({
-    month: h.label,
-    value: h.netWorth
+  const chartData = (history || []).slice(-chartRange).map((h) => ({
+    month: h.label || 'N/A',
+    value: Number(h.netWorth || 0)
   }));
 
-  const flowData = data.monthlyIncome > 0 || data.monthlyExpense > 0
-    ? [{ month: currentMonthLabel, income: data.monthlyIncome, expense: data.monthlyExpense }]
+  const flowData = monthlyIncome > 0 || monthlyExpense > 0
+    ? [{ month: currentMonthLabel, income: monthlyIncome, expense: monthlyExpense }]
     : [];
 
-  // Data for the Donut Chart
-  const assetData = (data.accounts || []).filter((a: any) => a.balance > 0).map((a: any) => ({
-    name: a.name, value: a.balance
+  const assetData = accounts.filter((a: any) => Number(a.balance) > 0).map((a: any) => ({
+    name: a.name || 'Account', value: Number(a.balance)
   }));
 
-  const smartInsights = generateInsights(history);
-  const forecast = history.length >= 2 ? computeForecast(history) : null;
-  const healthScore = computeHealthScore(history, data.accounts || []);
+  const smartInsights = generateInsights(history || []);
+  const forecast = (history || []).length >= 2 ? computeForecast(history) : null;
+  const healthScore = computeHealthScore(history || [], accounts);
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12 lg:pb-0">
@@ -113,7 +157,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
         </div>
       </div>
 
-      {/* KPIs - Horizontal Scroll on Mobile */}
+      {/* KPIs */}
       <div className="flex lg:grid lg:grid-cols-4 gap-4 overflow-x-auto lg:overflow-x-visible no-scrollbar -mx-4 px-4 lg:mx-0 lg:px-0 pb-4 lg:pb-0">
         {kpis.map((kpi, i) => (
           <motion.div
@@ -138,11 +182,8 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
             <div className="space-y-1">
               <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">{kpi.label}</p>
               <h3 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">
-                {typeof kpi.value === 'number' ? formatCurrency(kpi.value) : kpi.value}
+                {typeof kpi.value === 'number' ? formatCurrency(kpi.value) : (kpi.value || '0')}
               </h3>
-            </div>
-            <div className="absolute -right-4 -bottom-4 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity">
-              <kpi.icon className="w-24 h-24" />
             </div>
           </motion.div>
         ))}
@@ -156,7 +197,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
             <select
               value={chartRange}
               onChange={(e) => setChartRange(Number(e.target.value))}
-              className="px-3 py-1.5 rounded-lg bg-emerald-400/10 text-emerald-400 text-xs font-bold uppercase tracking-wider border border-emerald-400/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 appearance-none cursor-pointer [&>option]:bg-[#151518] [&>option]:text-white"
+              className="px-3 py-1.5 rounded-lg bg-emerald-400/10 text-emerald-400 text-xs font-bold uppercase tracking-wider border border-emerald-400/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer"
             >
               <option value={6}>6 Months</option>
               <option value={12}>1 Year</option>
@@ -164,7 +205,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
             </select>
           </div>
           <div className="h-[250px] lg:h-[300px] w-full mt-auto">
-            {data.totalNetWorth > 0 || data.accounts?.length > 0 ? (
+            {totalNetWorth > 0 || accounts.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData}>
                   <defs>
@@ -174,44 +215,22 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
-                  <XAxis
-                    dataKey="month"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#71717a', fontSize: 10 }}
-                    dy={10}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#71717a', fontSize: 10 }}
-                    tickFormatter={(val) => `${getCurrencySymbol()}${val / 1000}k`}
-                    width={35}
-                  />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }}
-                    itemStyle={{ color: '#10b981' }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#10b981"
-                    strokeWidth={3}
-                    fillOpacity={1}
-                    fill="url(#colorNetWorth)"
-                  />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} tickFormatter={(val) => `${getCurrencySymbol()}${val / 1000}k`} width={35} />
+                  <Tooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }} />
+                  <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorNetWorth)" />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500 space-y-4 text-center px-4">
                 <TrendingUp className="w-12 h-12 opacity-20" />
-                <p className="text-sm font-medium">Add accounts and transactions to see net worth growth.</p>
+                <p className="text-sm font-medium">Add accounts to see net worth growth.</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Account Breakdown */}
+        {/* Account Breakdown (Grouped) */}
         <div className="bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8 flex flex-col">
           <h3 className="text-lg lg:text-xl font-bold text-white mb-6">Asset Allocation</h3>
 
@@ -219,20 +238,8 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
             <div className="h-[180px] w-full mb-6 relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '12px' }}
-                    itemStyle={{ color: '#fff' }}
-                  />
-                  <Pie
-                    data={assetData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                    stroke="none"
-                  >
+                  <Tooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '12px' }} />
+                  <Pie data={assetData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
                     {assetData.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
@@ -242,34 +249,44 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="text-center mt-1">
                   <span className="text-emerald-400 font-bold text-xs uppercase tracking-widest block">Total</span>
-                  <span className="text-white font-bold text-lg">{formatCurrency(data.totalNetWorth)}</span>
+                  <span className="text-white font-bold text-lg">{formatCurrency(totalNetWorth)}</span>
                 </div>
               </div>
             </div>
           )}
 
-          {data.accounts?.length > 0 ? (
+          {groupedAccounts.length > 0 ? (
             <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1 mb-6">
-              {data.accounts.map((account: any, i: number) => {
-                const percentage = data.totalNetWorth > 0 ? ((account.balance / data.totalNetWorth) * 100).toFixed(1) : '0.0';
+              {groupedAccounts.map(([type, group]) => {
+                const percentage = totalNetWorth > 0 ? ((group.total / totalNetWorth) * 100).toFixed(1) : '0.0';
                 return (
-                  <div key={account.id} className="flex items-center justify-between group">
+                  <button 
+                    key={type} 
+                    onClick={() => setSelectedGroup(type)}
+                    className="w-full flex items-center justify-between group text-left hover:bg-white/5 p-2 -mx-2 rounded-2xl transition-all"
+                  >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-zinc-400 group-hover:bg-emerald-500/10 group-hover:text-emerald-400 transition-all">
-                        <DollarSign className="w-5 h-5" />
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center transition-all",
+                        `text-${group.color}`
+                      )}>
+                        <group.icon className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-white text-sm font-bold">{account.name}</p>
-                        <p className="text-zinc-500 text-[10px] uppercase tracking-widest font-medium">{account.type}</p>
+                        <p className="text-white text-sm font-bold">{group.label}</p>
+                        <p className="text-zinc-500 text-[10px] uppercase tracking-widest font-medium">{group.accounts.length} Accounts</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-white text-sm font-bold">{formatCurrency(account.balance)}</p>
-                      <p className="text-emerald-400 text-[10px] font-bold">
-                        {percentage}%
-                      </p>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-white text-sm font-bold">{formatCurrency(group.total)}</p>
+                        <p className={cn("text-[10px] font-bold", `text-${group.color}`)}>
+                          {percentage}%
+                        </p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-zinc-400 transition-colors" />
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -296,23 +313,9 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={flowData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
-                  <XAxis
-                    dataKey="month"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#71717a', fontSize: 10 }}
-                    dy={10}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#71717a', fontSize: 10 }}
-                    tickFormatter={(val) => `${getCurrencySymbol()}${val / 1000}k`}
-                    width={35}
-                  />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }}
-                  />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} tickFormatter={(val) => `${getCurrencySymbol()}${val / 1000}k`} width={35} />
+                  <Tooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }} />
                   <Bar dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -320,7 +323,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500 space-y-4 text-center px-4">
                 <PieChartIcon className="w-12 h-12 opacity-20" />
-                <p className="text-sm font-medium">Add income or expense transactions to see cashflow.</p>
+                <p className="text-sm font-medium">No cashflow data for this month.</p>
               </div>
             )}
           </div>
@@ -332,24 +335,94 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
         </div>
       </div>
 
-      {/* Health Score + Forecast Row */}
+      {/* Health Score + Forecast */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
         <HealthScoreCard score={healthScore} compact />
-
         {forecast ? (
           <div className="bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg lg:text-xl font-bold text-white">Net Worth Forecast</h3>
-              <span className="text-xs text-zinc-500 font-bold uppercase tracking-widest">Projection</span>
-            </div>
+            <h3 className="text-lg lg:text-xl font-bold text-white mb-6">Net Worth Forecast</h3>
             <ForecastSection forecast={forecast} history={history} compact />
           </div>
         ) : (
           <div className="bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8 flex items-center justify-center">
-            <p className="text-zinc-600 text-sm text-center">Add more transactions across multiple months to enable forecasting.</p>
+            <p className="text-zinc-600 text-sm text-center">More data needed for forecasting.</p>
           </div>
         )}
       </div>
+
+      {/* Detail Modal */}
+      <AnimatePresence>
+        {selectedGroup && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedGroup(null)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-x-4 top-[15%] bottom-[15%] lg:inset-auto lg:top-[20%] lg:left-1/2 lg:-translate-x-1/2 lg:w-[500px] bg-[#1a1a1f] border border-white/10 rounded-[32px] p-8 z-[110] shadow-2xl overflow-hidden flex flex-col"
+            >
+              <div className="flex items-start justify-between mb-8">
+                <div className="flex items-center gap-4">
+                  <div className={cn(
+                    "w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center",
+                    selectedGroup === 'bank' ? 'text-blue-400' : 
+                    selectedGroup === 'cash' ? 'text-emerald-400' : 'text-amber-400'
+                  )}>
+                    {selectedGroup === 'bank' ? <CreditCard /> : selectedGroup === 'cash' ? <Wallet /> : <Briefcase />}
+                  </div>
+                  <div>
+                    <h3 className="text-white text-2xl font-bold capitalize">{selectedGroup}s</h3>
+                    <p className="text-zinc-500 text-sm">Breakdown of your {selectedGroup} accounts</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedGroup(null)}
+                  className="p-2 rounded-xl bg-white/5 text-zinc-400 hover:text-white transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4 overflow-y-auto flex-1 pr-2 custom-scrollbar">
+                {(groupedAccounts.find(([type]) => type === selectedGroup)?.[1]?.accounts || [])
+                  .sort((a: any, b: any) => Number(b.balance || 0) - Number(a.balance || 0))
+                  .map((acc: any) => (
+                    <div key={acc.id} className="bg-white/5 rounded-2xl p-5 flex items-center justify-between group">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-zinc-400">
+                          <DollarSign className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-white font-bold">{acc.name || 'Account'}</p>
+                          <p className="text-zinc-500 text-xs">{acc.type || 'N/A'}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-white font-bold text-lg">{formatCurrency(acc.balance || 0)}</p>
+                        <p className="text-emerald-400 text-xs font-bold">
+                          {totalNetWorth > 0 ? ((Number(acc.balance || 0) / totalNetWorth) * 100).toFixed(1) : '0.0'}%
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center">
+                <p className="text-zinc-500 text-sm font-bold uppercase tracking-widest">Total {selectedGroup}s</p>
+                <p className="text-white text-2xl font-bold">
+                  {formatCurrency(groupedAccounts.find(([type]) => type === selectedGroup)?.[1]?.total || 0)}
+                </p>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
