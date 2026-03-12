@@ -68,7 +68,7 @@ const CATEGORY_MAP: Record<string, string> = {
     // Food
     lunch: 'food', breakfast: 'food', dinner: 'food', snack: 'food',
     coffee: 'food', tea: 'food', meal: 'food', food: 'food', restaurant: 'food',
-    pizza: 'food', burger: 'food', cafe: 'food', drinks: 'food',
+    pizza: 'food', burger: 'food', cafe: 'food', drinks: 'food', momo: 'food',
     // Transport
     taxi: 'transport', uber: 'transport', cab: 'transport', bus: 'transport',
     fuel: 'transport', petrol: 'transport', gas: 'transport', metro: 'transport',
