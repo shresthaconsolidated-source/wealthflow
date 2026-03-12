@@ -58,11 +58,19 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
       .then(d => {
         console.log('Dashboard Data:', d);
         setData(d);
+        // Reset selected group if it's no longer valid in new data
+        if (selectedGroup && !d.accounts?.some((a: any) => a.type?.toLowerCase() === selectedGroup)) {
+          setSelectedGroup(null);
+        }
       })
       .catch(err => {
         console.error('Error fetching dashboard data:', err);
       });
   }, [selectedMonth, fetchWithAuth]);
+
+  useEffect(() => {
+    setSelectedGroup(null); // Clear modal state when month changes
+  }, [selectedMonth]);
 
   useEffect(() => {
     fetchWithAuth('/api/dashboard/history?months=12')
@@ -436,8 +444,8 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
               </div>
 
               <div className="space-y-4 overflow-y-auto flex-1 pr-2 custom-scrollbar">
-                {groupedAccounts.find(([type]) => type === selectedGroup)?.[1].accounts
-                  .sort((a, b) => b.balance - a.balance)
+                {(groupedAccounts.find(([type]) => type === selectedGroup)?.[1]?.accounts || [])
+                  .sort((a: any, b: any) => b.balance - a.balance)
                   .map((acc: any) => (
                     <div key={acc.id} className="bg-white/5 rounded-2xl p-5 flex items-center justify-between group">
                       <div className="flex items-center gap-4">
@@ -462,7 +470,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
               <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center">
                 <p className="text-zinc-500 text-sm font-bold uppercase tracking-widest">Total {selectedGroup}s</p>
                 <p className="text-white text-2xl font-bold">
-                  {formatCurrency(groupedAccounts.find(([type]) => type === selectedGroup)?.[1].total || 0)}
+                  {formatCurrency(groupedAccounts.find(([type]) => type === selectedGroup)?.[1]?.total || 0)}
                 </p>
               </div>
             </motion.div>
