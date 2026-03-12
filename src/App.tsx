@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
 import Sidebar from '@/src/components/Sidebar';
 import Dashboard from '@/src/components/Dashboard';
@@ -6,6 +6,7 @@ import Transactions from '@/src/components/Transactions';
 import Analysis from '@/src/components/Analysis';
 import Settings from '@/src/components/Settings';
 import Donations from '@/src/components/Donations';
+import AdminPulse from '@/src/components/AdminPulse';
 import { Wallet, Shield, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -19,6 +20,28 @@ const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '631803362356-e9sld8un
 export default function App() {
   const { user, loading, login } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isAdminView, setIsAdminView] = useState(window.location.pathname === '/admin-pulse');
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setIsAdminView(window.location.pathname === '/admin-pulse');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const toggleAdmin = (show: boolean) => {
+    setIsAdminView(show);
+    window.history.pushState({}, '', show ? '/admin-pulse' : '/');
+  };
+
+  if (isAdminView && user) {
+    return (
+      <GoogleOAuthProvider clientId={clientId}>
+        <AdminPulse onBack={() => toggleAdmin(false)} />
+      </GoogleOAuthProvider>
+    );
+  }
 
   return (
     <GoogleOAuthProvider clientId={clientId}>

@@ -19,6 +19,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "").split(",").map(e => e.trim().toLowerCase());
 
 const app = express();
 app.use(compression());
@@ -118,12 +119,18 @@ app.post(["/api/auth/google", "/auth/google"], async (req, res) => {
       await supabase.from('accounts').insert(defaultAccounts);
       await supabase.from('categories').insert(defaultCategories);
 
-    } else {
-      finalUserId = existingUser.id;
-      await supabase
-        .from('users')
-        .update({ name, picture })
-        .eq('email', email);
+    }
+
+    // Attempt to update last_login_at (wrapped in try-catch in case column doesn't exist yet)
+    try {
+      await supabase.from('users').update({ 
+        name, 
+        picture,
+        last_login_at: new Date().toISOString() 
+      } as any).eq('email', email);
+    } catch (e) {
+      console.warn("last_login_at column likely missing in users table.");
+      await supabase.from('users').update({ name, picture }).eq('email', email);
     }
 
     // Generate session JWT
@@ -519,6 +526,44 @@ app.use((err: any, req: any, res: any, next: any) => {
     stack: process.env.NODE_ENV === 'production' ? null : err.stack 
   });
 });
+
+// Admin Stats - Restricted to ADMIN_EMAILS
+app.get(["/api/admin/stats", "/admin/stats"], asyncHandler(async (req: any, res: any) => {
+  const user = req.user;
+  if (!user || !ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+    return res.status(403).json({ error: "Access denied. Admins only." });
+  }
+
+  // Aggregate stats
+  const [{ data: users }, { data: transactions }] = await Promise.all([
+    supabase.from('users').select('id, name, email, picture, created_at').order('created_at', { ascending: false }),
+    supabase.from('transactions').select('user_id, date, created_at, amount, type')
+  ]);
+
+  // Calculate daily activity
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  const yesterday = new Date(now.getTime() - 86400000).toISOString().split('T')[0];
+
+  const stats = (users || []).map(u => {
+    const userTxs = (transactions || []).filter(t => t.user_id === u.id);
+    const todayCount = userTxs.filter(t => (t.created_at || t.date).startsWith(today)).length;
+    const totalCount = userTxs.length;
+
+    return {
+      ...u,
+      todayCount,
+      totalCount,
+      lastActive: userTxs.length > 0 ? (userTxs[0].created_at || userTxs[0].date) : u.created_at
+    };
+  });
+
+  res.json({
+    totalUsers: users?.length || 0,
+    activeToday: stats.filter(s => s.todayCount > 0).length,
+    users: stats
+  });
+}));
 
 app.get(["/api/dashboard", "/dashboard"], async (req, res) => {
   const userId = (req as any).user.id;
