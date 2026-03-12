@@ -10,12 +10,31 @@ import {
   previousDay, 
   parseISO, 
   isValid,
-  startOfWeek
+  startOfWeek,
+  setMonth,
+  setYear,
+  setDay as setDayOfWeek,
+  setDate as setDayOfMonth
 } from 'date-fns';
 
 type Day = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 const DAY_MAP: Record<string, Day> = {
   sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6
+};
+
+const MONTH_MAP: Record<string, number> = {
+  jan: 0, january: 0,
+  feb: 1, february: 1,
+  mar: 2, march: 2,
+  apr: 3, april: 3,
+  may: 4,
+  jun: 5, june: 5,
+  jul: 6, july: 6,
+  aug: 7, august: 7,
+  sep: 8, september: 8,
+  oct: 9, october: 9,
+  nov: 10, november: 10,
+  dec: 11, december: 11
 };
 
 export interface ParsedTransaction {
@@ -125,22 +144,72 @@ function extractAmount(text: string): number | null {
     return val;
 }
 
+function getAbsoluteDate(text: string): { date: string, phrase: string } | null {
+    const lower = text.toLowerCase();
+    
+    // Pattern 1: "25th oct 2025" or "25 oct 2025" or "25th oct"
+    // Match: [day] [month] [year?]
+    const dmyMatch = lower.match(/\b(\d+)(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*(\d{4})?\b/i);
+    if (dmyMatch) {
+        const day = parseInt(dmyMatch[1]);
+        const monthName = dmyMatch[2].toLowerCase();
+        const year = dmyMatch[3] ? parseInt(dmyMatch[3]) : new Date().getFullYear();
+        const month = MONTH_MAP[monthName];
+        
+        let d = startOfToday();
+        d = setYear(d, year);
+        d = setMonth(d, month);
+        d = setDayOfMonth(d, day);
+        
+        if (isValid(d)) {
+            return { date: format(d, 'yyyy-MM-dd'), phrase: dmyMatch[0] };
+        }
+    }
+
+    // Pattern 2: "oct 25th 2025" or "oct 25"
+    // Match: [month] [day] [year?]
+    const mdyMatch = lower.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d+)(?:st|nd|rd|th)?\s*(\d{4})?\b/i);
+    if (mdyMatch) {
+        const monthName = mdyMatch[1].toLowerCase();
+        const day = parseInt(mdyMatch[2]);
+        const year = mdyMatch[3] ? parseInt(mdyMatch[3]) : new Date().getFullYear();
+        const month = MONTH_MAP[monthName];
+
+        let d = startOfToday();
+        d = setYear(d, year);
+        d = setMonth(d, month);
+        d = setDayOfMonth(d, day);
+
+        if (isValid(d)) {
+            return { date: format(d, 'yyyy-MM-dd'), phrase: mdyMatch[0] };
+        }
+    }
+
+    return null;
+}
+
 function extractDate(text: string): { date: string; cleaned: string } {
     const lowerText = text.toLowerCase();
     
-    // 1. Check simple words first
+    // 1. Check simple words first (today, yesterday)
     for (const [phrase, fn] of Object.entries(DATE_WORDS)) {
-        if (lowerText.includes(phrase)) {
+        if (new RegExp(`\\b${phrase}\\b`, 'i').test(text)) {
             return { date: fn(), cleaned: text.replace(new RegExp(`\\b${phrase}\\b`, 'i'), '').trim() };
         }
     }
 
-    // 2. Check for "last week" specifically to avoid regex collision
-    if (lowerText.includes('last week')) {
+    // 2. Check for "last week" specifically
+    if (/\blast week\b/i.test(text)) {
         return { date: getRelativeDate('last week')!, cleaned: text.replace(/last week/i, '').trim() };
     }
 
-    // 3. Check relative days like "last friday", "friday"
+    // 3. Check for absolute dates like "25th oct 2025"
+    const absDate = getAbsoluteDate(text);
+    if (absDate) {
+        return { date: absDate.date, cleaned: text.replace(new RegExp(absDate.phrase, 'i'), '').trim() };
+    }
+
+    // 4. Check relative days like "last friday", "friday"
     const relativeRegex = /\b(last|this|next)?\s*(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/gi;
     const match = text.match(relativeRegex);
     if (match) {
@@ -230,11 +299,12 @@ export function parseTransactionMessage(
     const category_keyword = detectCategory(cleaned);
 
     // 6. Build note from remaining meaningful words
-    const stripWords = ['from', 'to', amount.toString(), date, 'transfer', 'send'];
     let note = cleaned
-        .replace(/\b\d[\d,]*(?:\.\d+)?\s*k?\b/i, '')
-        .replace(/\b(from|to)\s+\S+/gi, '')
+        .replace(/\b\d[\d,]*(?:\.\d+)?\s*k?\b/i, '') // strip amount
+        .replace(/\b(from|to|on|at|for)\s+\S+/gi, '') // strip prepositions and following word
         .replace(/\b(today|yesterday|last week)\b/gi, '')
+        .replace(/\b(on|at|for)\b/gi, '') // strip hanging prepositions
+        .replace(/\s+/g, ' ')
         .trim();
     if (!note) note = message.trim();
 
