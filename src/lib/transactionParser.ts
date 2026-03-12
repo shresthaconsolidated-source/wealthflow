@@ -1,7 +1,5 @@
 // ============================================================
-// transactionParser.ts
-// Deterministic rule-based freetext transaction parser.
-// No external AI APIs — uses regex, keyword dicts, and fuzzy match.
+// transactionParser.ts — Advanced Smart Parser
 // ============================================================
 
 export interface ParsedTransaction {
@@ -15,8 +13,6 @@ export interface ParsedTransaction {
     confidence: 'high' | 'medium' | 'low';
 }
 
-// ---- Keyword Dictionaries ----
-
 const INCOME_KEYWORDS = [
     'salary', 'income', 'received', 'payment', 'interest', 'dividend',
     'bonus', 'revenue', 'deposit', 'credit', 'earning', 'wage', 'freelance',
@@ -24,170 +20,173 @@ const INCOME_KEYWORDS = [
 ];
 
 const TRANSFER_KEYWORDS = [
-    'transfer', 'move', 'send', 'sent', 'moved', 'shifting', 'shift',
+    'transfer', 'move', 'send', 'sent', 'moved', 'shifting', 'shift', 'between',
 ];
 
 const CATEGORY_MAP: Record<string, string> = {
-    // Food
     lunch: 'food', breakfast: 'food', dinner: 'food', snack: 'food',
     coffee: 'food', tea: 'food', meal: 'food', food: 'food', restaurant: 'food',
-    pizza: 'food', burger: 'food', cafe: 'food', drinks: 'food',
-    // Transport
     taxi: 'transport', uber: 'transport', cab: 'transport', bus: 'transport',
-    fuel: 'transport', petrol: 'transport', gas: 'transport', metro: 'transport',
-    flight: 'transport', travel: 'transport', transport: 'transport', fare: 'transport',
-    // Shopping
-    shopping: 'shopping', clothes: 'shopping', shirt: 'shopping', shoes: 'shopping',
-    purchase: 'shopping', bought: 'shopping', amazon: 'shopping', online: 'shopping',
-    // Health
+    fuel: 'transport', petrol: 'transport', gas: 'transport',
+    shopping: 'shopping', clothes: 'shopping', purchase: 'shopping', bought: 'shopping',
     medicine: 'health', doctor: 'health', hospital: 'health', pharmacy: 'health',
-    health: 'health', gym: 'health', fitness: 'health',
-    // Utilities
+    gym: 'health', fitness: 'health',
     electricity: 'utilities', water: 'utilities', internet: 'utilities',
-    wifi: 'utilities', phone: 'utilities', bill: 'utilities', subscription: 'utilities',
-    netflix: 'utilities', spotify: 'utilities', rent: 'utilities',
-    // Income
-    salary: 'salary', interest: 'interest', dividend: 'dividends',
-    bonus: 'bonus', freelance: 'freelance',
-    // Investment
+    bill: 'utilities', rent: 'utilities',
+    salary: 'salary', bonus: 'bonus', freelance: 'freelance',
     shares: 'investments', stocks: 'investments', crypto: 'investments',
-    investment: 'investments', mutual: 'investments',
 };
 
-const DATE_WORDS: Record<string, () => string> = {
-    today: () => new Date().toISOString().slice(0, 10),
-    yesterday: () => {
-        const d = new Date();
-        d.setDate(d.getDate() - 1);
-        return d.toISOString().slice(0, 10);
-    },
-    'last week': () => {
-        const d = new Date();
-        d.setDate(d.getDate() - 7);
-        return d.toISOString().slice(0, 10);
-    },
-    'this week': () => new Date().toISOString().slice(0, 10),
-};
-
-// ---- Helpers ----
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
 function extractAmount(text: string): number | null {
-    // Match: 1200, 1,200, 1.2k, 12.5, 45000
-    // We capture the numeric part including commas and decimals.
-    // The trailing 'k' or 'K' is handled outside the numeric capture regex.
     const match = text.match(/\b(\d+([\.,]\d+)?)\s*(k\b)?/i);
     if (!match) return null;
-    
-    // Replace commas before parsing
     let val = parseFloat(match[1].replace(/,/g, ''));
-    
-    // If the 3rd capture group matched 'k' (case insensitive), multiply by 1000
-    if (match[3] && match[3].toLowerCase() === 'k') {
-        val *= 1000;
-    }
-    
+    if (match[3] && match[3].toLowerCase() === 'k') val *= 1000;
     return val;
 }
 
+function formatDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 function extractDate(text: string): { date: string; cleaned: string } {
-    let remaining = text;
-    for (const [phrase, fn] of Object.entries(DATE_WORDS)) {
-        if (remaining.toLowerCase().includes(phrase)) {
-            remaining = remaining.toLowerCase().replace(phrase, '').trim();
-            return { date: fn(), cleaned: remaining };
+    let lower = text.toLowerCase();
+    const now = new Date();
+    let target = new Date(now);
+
+    // 1. Relative phrases
+    if (lower.includes('today')) {
+        return { date: formatDate(now), cleaned: lower.replace('today', '').trim() };
+    }
+    if (lower.includes('yesterday')) {
+        target.setDate(now.getDate() - 1);
+        return { date: formatDate(target), cleaned: lower.replace('yesterday', '').trim() };
+    }
+    
+    const lastMonthMatch = lower.match(/last month/i);
+    if (lastMonthMatch) {
+        target.setMonth(now.getMonth() - 1);
+        return { date: formatDate(target), cleaned: lower.replace(/last month/i, '').trim() };
+    }
+
+    const agoMatch = lower.match(/(\d+)\s+days?\s+ago/i);
+    if (agoMatch) {
+        target.setDate(now.getDate() - parseInt(agoMatch[1]));
+        return { date: formatDate(target), cleaned: lower.replace(agoMatch[0], '').trim() };
+    }
+
+    // 2. Month names (e.g. 25th oct, oct 25, 25 oct)
+    for (let i = 0; i < MONTHS.length; i++) {
+        const m = MONTHS[i];
+        const monthRegex = new RegExp(`(\\d{1,2})(?:st|nd|rd|th)?\\s+${m}|${m}\\s+(\\d{1,2})(?:st|nd|rd|th)?`, 'i');
+        const mMatch = lower.match(monthRegex);
+        if (mMatch) {
+            const day = parseInt(mMatch[1] || mMatch[2]);
+            const d = new Date(now.getFullYear(), i, day);
+            // If date is in future, assume last year
+            if (d > now) d.setFullYear(now.getFullYear() - 1);
+            return { date: formatDate(d), cleaned: lower.replace(mMatch[0], '').trim() };
         }
     }
-    return { date: new Date().toISOString().slice(0, 10), cleaned: text };
+
+    return { date: formatDate(now), cleaned: text };
 }
 
 function fuzzyMatch(input: string, candidates: string[]): string | undefined {
-    const lower = input.toLowerCase();
-    // Exact
-    const exact = candidates.find(c => c.toLowerCase() === lower);
-    if (exact) return exact;
-    // Substring
-    return candidates.find(c =>
-        c.toLowerCase().includes(lower) || lower.includes(c.toLowerCase())
-    );
-}
+    if (!input || !candidates.length) return undefined;
+    const lower = input.toLowerCase().trim();
+    if (lower.length < 2) return undefined;
 
-function detectType(text: string): 'income' | 'expense' | 'transfer' {
-    const lower = text.toLowerCase();
-    if (TRANSFER_KEYWORDS.some(k => lower.includes(k))) return 'transfer';
-    if (INCOME_KEYWORDS.some(k => lower.includes(k))) return 'income';
-    return 'expense';
+    return candidates.find(c => {
+        const cl = c.toLowerCase();
+        return cl === lower || cl.includes(lower) || lower.includes(cl);
+    });
 }
-
-function detectCategory(text: string): string | undefined {
-    const lower = text.toLowerCase();
-    for (const [kw, cat] of Object.entries(CATEGORY_MAP)) {
-        if (lower.includes(kw)) return cat;
-    }
-    return undefined;
-}
-
-// ---- Main Parse Function ----
 
 export function parseTransactionMessage(
     message: string,
     accounts: { id: string; name: string }[],
     categories: { id: string; name: string; type: string }[]
 ): ParsedTransaction | null {
-    if (!message.trim()) return null;
+    if (!message?.trim()) return null;
 
-    const accountNames = accounts.map(a => a.name);
-    const categoryNames = categories.map(c => c.name);
-
-    // 1. Extract amount
+    const accountNames = (accounts || []).map(a => a.name);
+    
     const amount = extractAmount(message);
     if (!amount || amount <= 0) return null;
 
-    // 2. Extract date
     const { date, cleaned } = extractDate(message);
+    const lower = cleaned.toLowerCase();
 
-    // 3. Detect transaction type
-    const type = detectType(cleaned);
+    // Type detection
+    let type: 'income' | 'expense' | 'transfer' = 'expense';
+    if (TRANSFER_KEYWORDS.some(k => lower.includes(k))) type = 'transfer';
+    else if (INCOME_KEYWORDS.some(k => lower.includes(k))) type = 'income';
 
-    // 4. Detect accounts
+    // Account detection via prepositions: from, to, by, in, into, on
     let from_account_name: string | undefined;
     let to_account_name: string | undefined;
 
-    // "from X to Y" pattern
-    const fromToMatch = cleaned.match(/from\s+(.+?)\s+to\s+(.+?)(?:\s|$)/i);
-    if (fromToMatch) {
-        from_account_name = fuzzyMatch(fromToMatch[1], accountNames);
-        to_account_name = fuzzyMatch(fromToMatch[2], accountNames);
-    } else {
-        // "to X" pattern (income destination)
-        const toMatch = cleaned.match(/\bto\s+(.+?)(?:\s|$)/i);
-        if (toMatch) {
-            const matched = fuzzyMatch(toMatch[1], accountNames);
-            if (type === 'income') to_account_name = matched;
-            else if (type === 'transfer') to_account_name = matched;
-        }
-        // "from X" pattern (expense source)
-        const fromMatch = cleaned.match(/\bfrom\s+(.+?)(?:\s|$)/i);
-        if (fromMatch && !fromToMatch) {
-            from_account_name = fuzzyMatch(fromMatch[1], accountNames);
+    const preps = ['from', 'to', 'by', 'in', 'into', 'on'];
+    const prepRegex = new RegExp(`\\b(${preps.join('|')})\\s+([\\w\\s]+?)(?=\\s+(?:${preps.join('|')}|\\d)|$)`, 'gi');
+    
+    let match;
+    while ((match = prepRegex.exec(lower)) !== null) {
+        const prep = match[1].toLowerCase();
+        const rawName = match[2].trim();
+        const matchedAccount = fuzzyMatch(rawName, accountNames);
+
+        if (matchedAccount) {
+            if (prep === 'from') from_account_name = matchedAccount;
+            else if (prep === 'to' || prep === 'into' || prep === 'in' || prep === 'on' || prep === 'by') {
+                if (type === 'income') to_account_name = matchedAccount;
+                else if (type === 'transfer') {
+                    if (prep === 'from') from_account_name = matchedAccount;
+                    else to_account_name = matchedAccount;
+                } else {
+                    // expense: "by cash", "on bank"
+                    from_account_name = matchedAccount;
+                }
+            }
         }
     }
 
-    // 5. Detect category
-    const category_keyword = detectCategory(cleaned);
+    // Special case for transfers without explicit from/to headers but two accounts mentioned
+    if (type === 'transfer' && !from_account_name && !to_account_name) {
+        // try to find any two account names mentioned
+        const found = accountNames.filter(n => lower.includes(n.toLowerCase()));
+        if (found.length >= 1) from_account_name = found[0];
+        if (found.length >= 2) to_account_name = found[1];
+    }
 
-    // 6. Build note from remaining meaningful words
-    const stripWords = ['from', 'to', amount.toString(), date, 'transfer', 'send'];
-    let note = cleaned
-        .replace(/\b\d[\d,]*(?:\.\d+)?\s*k?\b/i, '')
-        .replace(/\b(from|to)\s+\S+/gi, '')
-        .replace(/\b(today|yesterday|last week)\b/gi, '')
+    // Category detection
+    let category_keyword: string | undefined;
+    for (const [kw, cat] of Object.entries(CATEGORY_MAP)) {
+        if (lower.includes(kw)) {
+            category_keyword = cat;
+            break;
+        }
+    }
+
+    // Clean Note
+    let note = message
+        .replace(/\b\d[\d,]*(?:\.\d+)?\s*k?\b/gi, '') // remove amount
+        .replace(new RegExp(`\\b(${preps.join('|')})\\s+.*?(\\s|$)`, 'gi'), ' ') // remove account phrases
+        .replace(/(today|yesterday|last month|last week|\d+\s+days?\s+ago)/gi, '') // remove dates
+        .replace(/\s+/g, ' ')
         .trim();
-    if (!note) note = message.trim();
 
-    // 7. Confidence
+    if (!note || note.length < 2) note = message.trim();
+
+    // Confidence
     let confidence: 'high' | 'medium' | 'low' = 'low';
-    if (amount && (category_keyword || from_account_name || to_account_name)) confidence = 'medium';
-    if (amount && category_keyword && (from_account_name || to_account_name || type !== 'transfer')) confidence = 'high';
+    if (category_keyword || from_account_name || to_account_name) confidence = 'medium';
+    if (category_keyword && (from_account_name || to_account_name)) confidence = 'high';
 
     return { type, amount, note, date, from_account_name, to_account_name, category_keyword, confidence };
 }
