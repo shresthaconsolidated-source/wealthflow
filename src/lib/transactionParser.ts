@@ -276,22 +276,22 @@ export function parseTransactionMessage(
     let to_account_name: string | undefined;
 
     // "from X to Y" pattern
-    const fromToMatch = cleaned.match(/from\s+(.+?)\s+to\s+(.+?)(?:\s|$)/i);
+    const fromToMatch = cleaned.match(/\b(from|by)\s+(.+?)\s+(to|in|into)\s+(.+?)(?:\s|$)/i);
     if (fromToMatch) {
-        from_account_name = fuzzyMatch(fromToMatch[1], accountNames);
-        to_account_name = fuzzyMatch(fromToMatch[2], accountNames);
+        from_account_name = fuzzyMatch(fromToMatch[2], accountNames);
+        to_account_name = fuzzyMatch(fromToMatch[4], accountNames);
     } else {
-        // "to X" pattern (income destination)
-        const toMatch = cleaned.match(/\bto\s+(.+?)(?:\s|$)/i);
+        // "to X" / "in X" pattern (income destination / transfer to)
+        const toMatch = cleaned.match(/\b(to|in|into)\s+(.+?)(?:\s|$)/i);
         if (toMatch) {
-            const matched = fuzzyMatch(toMatch[1], accountNames);
-            if (type === 'income') to_account_name = matched;
-            else if (type === 'transfer') to_account_name = matched;
+            const matched = fuzzyMatch(toMatch[2], accountNames);
+            if (type === 'income' || type === 'transfer') to_account_name = matched;
+            else if (type === 'expense' && !from_account_name) from_account_name = matched; // e.g., "momo 200 in cash"
         }
-        // "from X" pattern (expense source)
-        const fromMatch = cleaned.match(/\bfrom\s+(.+?)(?:\s|$)/i);
+        // "from X" / "by X" pattern (expense source)
+        const fromMatch = cleaned.match(/\b(from|by|at)\s+(.+?)(?:\s|$)/i);
         if (fromMatch && !fromToMatch) {
-            from_account_name = fuzzyMatch(fromMatch[1], accountNames);
+            from_account_name = fuzzyMatch(fromMatch[2], accountNames);
         }
     }
 
@@ -301,9 +301,9 @@ export function parseTransactionMessage(
     // 6. Build note from remaining meaningful words
     let note = cleaned
         .replace(/\b\d[\d,]*(?:\.\d+)?\s*k?\b/i, '') // strip amount
-        .replace(/\b(from|to|on|at|for)\s+\S+/gi, '') // strip prepositions and following word
+        .replace(/\b(from|to|on|at|for|by|in|into)\s+\S+/gi, '') // strip prepositions and following word
         .replace(/\b(today|yesterday|last week)\b/gi, '')
-        .replace(/\b(on|at|for)\b/gi, '') // strip hanging prepositions
+        .replace(/\b(on|at|for|by|in|into)\b/gi, '') // strip hanging prepositions
         .replace(/\s+/g, ' ')
         .trim();
     if (!note) note = message.trim();
