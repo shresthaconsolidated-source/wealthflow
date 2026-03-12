@@ -176,10 +176,23 @@ export function parseTransactionMessage(
     // Clean Note
     let note = message
         .replace(/\b\d[\d,]*(?:\.\d+)?\s*k?\b/gi, '') // remove amount
-        .replace(new RegExp(`\\b(${preps.join('|')})\\s+.*?(\\s|$)`, 'gi'), ' ') // remove account phrases
         .replace(/(today|yesterday|last month|last week|\d+\s+days?\s+ago)/gi, '') // remove dates
-        .replace(/\s+/g, ' ')
-        .trim();
+        .replace(new RegExp(`\\b(${preps.join('|')})\\s+`, 'gi'), ' '); // remove dangling prepositions
+    
+    // Remove detected account names
+    if (from_account_name) {
+        note = note.replace(new RegExp(`\\b${from_account_name}\\b`, 'gi'), '');
+    }
+    if (to_account_name) {
+        note = note.replace(new RegExp(`\\b${to_account_name}\\b`, 'gi'), '');
+    }
+
+    // Remove type keywords if they are isolated
+    [...INCOME_KEYWORDS, ...TRANSFER_KEYWORDS].forEach(kw => {
+        note = note.replace(new RegExp(`\\b${kw}\\b`, 'gi'), '');
+    });
+
+    note = note.replace(/\s+/g, ' ').trim();
 
     if (!note || note.length < 2) note = message.trim();
 

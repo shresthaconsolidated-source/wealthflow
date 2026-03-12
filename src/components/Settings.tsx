@@ -17,10 +17,7 @@ import {
   FileSpreadsheet,
   AlertCircle,
   CheckCircle2,
-  RefreshCw,
-  Wrench,
-  Database,
-  ShieldCheck
+  RefreshCw
 } from 'lucide-react';
 import { formatCurrency, cn, getCurrencySymbol } from '@/src/lib/utils';
 import { useApi } from '@/src/hooks/useApi';
@@ -167,26 +164,6 @@ export default function Settings() {
   };
 
   const [importing, setImporting] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-
-  const handleSyncBalances = async () => {
-    if (!confirm('This will recalculate all account balances strictly from your transaction history. Proceed?')) return;
-    setSyncing(true);
-    try {
-      const res = await fetchWithAuth('/api/maintenance/sync-balances', { method: 'POST' });
-      const d = await res.json();
-      if (d.success) {
-        showSuccess(`Successfully synchronized ${d.updated} account balances.`);
-        fetchData();
-      } else {
-        showError(d.error || 'Sync failed.');
-      }
-    } catch (e: any) {
-      showError(e.message);
-    } finally {
-      setSyncing(false);
-    }
-  };
   const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error', message: string, details?: string[] } | null>(null);
 
   const handleExport = async () => {
@@ -303,44 +280,6 @@ export default function Settings() {
           <h1 className="text-3xl lg:text-4xl font-extrabold text-white tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-500">Settings</h1>
           <p className="text-zinc-400 mt-2 text-sm lg:text-base font-medium">Configure your financial structure and preferences.</p>
         </div>
-
-        {/* System Maintenance */}
-        <div className="pt-12 border-t border-white/5 relative z-10">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-8">
-            <div>
-              <h3 className="text-xl lg:text-2xl font-bold text-white flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-orange-500/10 text-orange-400">
-                  <Wrench className="w-5 h-5" />
-                </div>
-                Maintenance
-              </h3>
-              <p className="text-zinc-500 text-sm mt-2">Tools to keep your financial data accurate and healthy.</p>
-            </div>
-          </div>
-
-          <div className="p-8 rounded-[32px] bg-orange-500/5 border border-orange-500/10 flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex gap-6 items-start">
-              <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center shrink-0">
-                <Database className="w-6 h-6 text-orange-400" />
-              </div>
-              <div>
-                <p className="text-white font-bold text-lg">Sync Account Balances</p>
-                <p className="text-zinc-500 text-sm mt-1 max-w-lg">
-                  If your balances feel "off" or inflated, this will recalculate every account strictly based on your transaction history + initial balances.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleSyncBalances}
-              disabled={syncing}
-              className="px-8 py-4 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-orange-500/20 transition-all disabled:opacity-50"
-            >
-              {syncing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
-              {syncing ? 'Syncing...' : 'Fix My Balances'}
-            </button>
-          </div>
-        </div>
-
       </div>
 
       {errorToast && (

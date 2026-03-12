@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, Zap, Sparkles, CheckCircle, Edit3, X } from 'lucide-react';
 import { parseTransactionMessage, type ParsedTransaction } from '@/src/lib/transactionParser';
 import { QUICK_ACTIONS, type QuickAction } from '@/src/lib/quickEntryConfig';
-import { formatCurrency, cn } from '@/src/lib/utils';
+import { formatCurrency, cn, getCurrencySymbol } from '@/src/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface Props {
@@ -437,7 +437,7 @@ export default function SmartTransactionInput({ accounts, categories, transactio
                 <div>
                   <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Amount</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-lg">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-lg">{getCurrencySymbol()}</span>
                     <input
                       autoFocus
                       type="number"
