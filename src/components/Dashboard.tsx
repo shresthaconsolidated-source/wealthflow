@@ -6,12 +6,7 @@ import {
   PieChart as PieChartIcon,
   ArrowUpRight,
   ArrowDownRight,
-  Plus,
-  Wallet,
-  CreditCard,
-  Briefcase,
-  X,
-  ChevronRight
+  Plus
 } from 'lucide-react';
 import {
   AreaChart,
@@ -28,7 +23,7 @@ import {
   Pie
 } from 'recharts';
 import { formatCurrency, cn, getCurrencySymbol } from '@/src/lib/utils';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { useApi } from '@/src/hooks/useApi';
 import InsightCards from './InsightCards';
 import HealthScoreCard from './HealthScoreCard';
@@ -47,7 +42,6 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
   const [data, setData] = useState<any>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [chartRange, setChartRange] = useState<number>(6);
-  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const { fetchWithAuth } = useApi();
 
   const [history, setHistory] = useState<any[]>([]);
@@ -90,26 +84,6 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
   const assetData = (data.accounts || []).filter((a: any) => a.balance > 0).map((a: any) => ({
     name: a.name, value: a.balance
   }));
-  
-  // Grouped Account Data
-  const groupedAccounts = React.useMemo(() => {
-    const groups: Record<string, { label: string, icon: any, color: string, total: number, accounts: any[] }> = {
-      bank: { label: 'Bank', icon: CreditCard, color: 'blue-400', total: 0, accounts: [] },
-      cash: { label: 'Cash', icon: Wallet, color: 'emerald-400', total: 0, accounts: [] },
-      asset: { label: 'Assets', icon: Briefcase, color: 'amber-400', total: 0, accounts: [] },
-    };
-
-    (data.accounts || []).forEach((acc: any) => {
-      const type = acc.type?.toLowerCase() || 'asset';
-      const targetGroup = groups[type] || groups.asset;
-      targetGroup.total += Number(acc.balance);
-      targetGroup.accounts.push(acc);
-    });
-
-    return Object.entries(groups)
-      .filter(([_, g]) => g.accounts.length > 0)
-      .sort((a, b) => b[1].total - a[1].total);
-  }, [data.accounts]);
 
   const smartInsights = generateInsights(history);
   const forecast = history.length >= 2 ? computeForecast(history) : null;
@@ -274,38 +248,28 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
             </div>
           )}
 
-          {groupedAccounts.length > 0 ? (
+          {data.accounts?.length > 0 ? (
             <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1 mb-6">
-              {groupedAccounts.map(([type, group]) => {
-                const percentage = data.totalNetWorth > 0 ? ((group.total / data.totalNetWorth) * 100).toFixed(1) : '0.0';
+              {data.accounts.map((account: any, i: number) => {
+                const percentage = data.totalNetWorth > 0 ? ((account.balance / data.totalNetWorth) * 100).toFixed(1) : '0.0';
                 return (
-                  <button 
-                    key={type} 
-                    onClick={() => setSelectedGroup(type)}
-                    className="w-full flex items-center justify-between group text-left hover:bg-white/5 p-2 -mx-2 rounded-2xl transition-all"
-                  >
+                  <div key={account.id} className="flex items-center justify-between group">
                     <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center transition-all",
-                        `text-${group.color}`
-                      )}>
-                        <group.icon className="w-5 h-5" />
+                      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-zinc-400 group-hover:bg-emerald-500/10 group-hover:text-emerald-400 transition-all">
+                        <DollarSign className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-white text-sm font-bold">{group.label}</p>
-                        <p className="text-zinc-500 text-[10px] uppercase tracking-widest font-medium">{group.accounts.length} Accounts</p>
+                        <p className="text-white text-sm font-bold">{account.name}</p>
+                        <p className="text-zinc-500 text-[10px] uppercase tracking-widest font-medium">{account.type}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="text-white text-sm font-bold">{formatCurrency(group.total)}</p>
-                        <p className={cn("text-[10px] font-bold", `text-${group.color}`)}>
-                          {percentage}%
-                        </p>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-zinc-400 transition-colors" />
+                    <div className="text-right">
+                      <p className="text-white text-sm font-bold">{formatCurrency(account.balance)}</p>
+                      <p className="text-emerald-400 text-[10px] font-bold">
+                        {percentage}%
+                      </p>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -386,78 +350,6 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
           </div>
         )}
       </div>
-      <AnimatePresence>
-        {selectedGroup && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedGroup(null)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100]"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed inset-x-4 top-[15%] bottom-[15%] lg:inset-auto lg:top-[20%] lg:left-1/2 lg:-translate-x-1/2 lg:w-[500px] bg-[#1a1a1f] border border-white/10 rounded-[32px] p-8 z-[110] shadow-2xl overflow-hidden flex flex-col"
-            >
-              <div className="flex items-start justify-between mb-8">
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center",
-                    selectedGroup === 'bank' ? 'text-blue-400' : 
-                    selectedGroup === 'cash' ? 'text-emerald-400' : 'text-amber-400'
-                  )}>
-                    {selectedGroup === 'bank' ? <CreditCard /> : selectedGroup === 'cash' ? <Wallet /> : <Briefcase />}
-                  </div>
-                  <div>
-                    <h3 className="text-white text-2xl font-bold capitalize">{selectedGroup}s</h3>
-                    <p className="text-zinc-500 text-sm">Breakdown of your {selectedGroup} accounts</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setSelectedGroup(null)}
-                  className="p-2 rounded-xl bg-white/5 text-zinc-400 hover:text-white transition-all"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="space-y-4 overflow-y-auto flex-1 pr-2 custom-scrollbar">
-                {groupedAccounts.find(([type]) => type === selectedGroup)?.[1].accounts
-                  .sort((a, b) => b.balance - a.balance)
-                  .map((acc: any) => (
-                    <div key={acc.id} className="bg-white/5 rounded-2xl p-5 flex items-center justify-between group">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-zinc-400">
-                          <DollarSign className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="text-white font-bold">{acc.name}</p>
-                          <p className="text-zinc-500 text-xs">{acc.type}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-white font-bold text-lg">{formatCurrency(acc.balance)}</p>
-                        <p className="text-emerald-400 text-xs font-bold">
-                          {data.totalNetWorth > 0 ? ((acc.balance / data.totalNetWorth) * 100).toFixed(1) : '0.0'}%
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-
-              <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center">
-                <p className="text-zinc-500 text-sm font-bold uppercase tracking-widest">Total {selectedGroup}s</p>
-                <p className="text-white text-2xl font-bold">
-                  {formatCurrency(groupedAccounts.find(([type]) => type === selectedGroup)?.[1].total || 0)}
-                </p>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

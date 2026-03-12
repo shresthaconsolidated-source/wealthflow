@@ -1,45 +1,8 @@
+// ============================================================
 // transactionParser.ts
 // Deterministic rule-based freetext transaction parser.
 // No external AI APIs — uses regex, keyword dicts, and fuzzy match.
 // ============================================================
-import { 
-  format, 
-  subDays, 
-  startOfToday, 
-  nextDay, 
-  previousDay, 
-  parseISO, 
-  isValid,
-  startOfWeek,
-  setMonth,
-  setYear,
-  setDay as setDayOfWeek,
-  setDate as setDayOfMonth,
-  subMonths,
-  subYears,
-  startOfMonth,
-  startOfYear
-} from 'date-fns';
-
-type Day = 0 | 1 | 2 | 3 | 4 | 5 | 6;
-const DAY_MAP: Record<string, Day> = {
-  sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6
-};
-
-const MONTH_MAP: Record<string, number> = {
-  jan: 0, january: 0,
-  feb: 1, february: 1,
-  mar: 2, march: 2,
-  apr: 3, april: 3,
-  may: 4,
-  jun: 5, june: 5,
-  jul: 6, july: 6,
-  aug: 7, august: 7,
-  sep: 8, september: 8,
-  oct: 9, october: 9,
-  nov: 10, november: 10,
-  dec: 11, december: 11
-};
 
 export interface ParsedTransaction {
     type: 'income' | 'expense' | 'transfer';
@@ -68,7 +31,7 @@ const CATEGORY_MAP: Record<string, string> = {
     // Food
     lunch: 'food', breakfast: 'food', dinner: 'food', snack: 'food',
     coffee: 'food', tea: 'food', meal: 'food', food: 'food', restaurant: 'food',
-    pizza: 'food', burger: 'food', cafe: 'food', drinks: 'food', momo: 'food',
+    pizza: 'food', burger: 'food', cafe: 'food', drinks: 'food',
     // Transport
     taxi: 'transport', uber: 'transport', cab: 'transport', bus: 'transport',
     fuel: 'transport', petrol: 'transport', gas: 'transport', metro: 'transport',
@@ -92,45 +55,19 @@ const CATEGORY_MAP: Record<string, string> = {
 };
 
 const DATE_WORDS: Record<string, () => string> = {
-    today: () => format(startOfToday(), 'yyyy-MM-dd'),
-    yesterday: () => format(subDays(startOfToday(), 1), 'yyyy-MM-dd'),
+    today: () => new Date().toISOString().slice(0, 10),
+    yesterday: () => {
+        const d = new Date();
+        d.setDate(d.getDate() - 1);
+        return d.toISOString().slice(0, 10);
+    },
+    'last week': () => {
+        const d = new Date();
+        d.setDate(d.getDate() - 7);
+        return d.toISOString().slice(0, 10);
+    },
+    'this week': () => new Date().toISOString().slice(0, 10),
 };
-
-function getRelativeDate(phrase: string): string | null {
-    const lower = phrase.toLowerCase().trim();
-    const today = startOfToday();
-
-    if (lower === 'last week') return format(subDays(today, 7), 'yyyy-MM-dd');
-    if (lower === 'last month') return format(subMonths(today, 1), 'yyyy-MM-dd');
-    if (lower === 'this month') return format(startOfMonth(today), 'yyyy-MM-dd');
-    if (lower === 'last year') return format(subYears(today, 1), 'yyyy-MM-dd');
-    if (lower === 'this year') return format(startOfYear(today), 'yyyy-MM-dd');
-
-    // Handle "last Friday", "this Monday", "next Friday"
-    const match = lower.match(/^(?:(last|this|next)\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)$/);
-    if (match) {
-        const modifier = match[1] || 'this'; // default to 'this'
-        const dayName = match[2];
-        const targetDay = DAY_MAP[dayName];
-
-        if (modifier === 'last') {
-            return format(previousDay(today, targetDay), 'yyyy-MM-dd');
-        } else if (modifier === 'next') {
-            return format(nextDay(today, targetDay), 'yyyy-MM-dd');
-        } else {
-            // "this Friday"
-            // If today is the target day, return today.
-            if (today.getDay() === targetDay) return format(today, 'yyyy-MM-dd');
-            
-            // Otherwise, get the day in the current week (Sunday to Saturday)
-            const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Start at Monday
-            const dayInWeek = nextDay(subDays(weekStart, 1), targetDay);
-            return format(dayInWeek, 'yyyy-MM-dd');
-        }
-    }
-
-    return null;
-}
 
 // ---- Helpers ----
 
@@ -152,86 +89,15 @@ function extractAmount(text: string): number | null {
     return val;
 }
 
-function getAbsoluteDate(text: string): { date: string, phrase: string } | null {
-    const lower = text.toLowerCase();
-    
-    // Pattern 1: "25th oct 2025" or "25 oct 2025" or "25th oct"
-    // Match: [day] [month] [year?]
-    const dmyMatch = lower.match(/\b(\d+)(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*(\d{4})?\b/i);
-    if (dmyMatch) {
-        const day = parseInt(dmyMatch[1]);
-        const monthName = dmyMatch[2].toLowerCase();
-        const year = dmyMatch[3] ? parseInt(dmyMatch[3]) : new Date().getFullYear();
-        const month = MONTH_MAP[monthName];
-        
-        let d = startOfToday();
-        d = setYear(d, year);
-        d = setMonth(d, month);
-        d = setDayOfMonth(d, day);
-        
-        if (isValid(d)) {
-            return { date: format(d, 'yyyy-MM-dd'), phrase: dmyMatch[0] };
-        }
-    }
-
-    // Pattern 2: "oct 25th 2025" or "oct 25"
-    // Match: [month] [day] [year?]
-    const mdyMatch = lower.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d+)(?:st|nd|rd|th)?\s*(\d{4})?\b/i);
-    if (mdyMatch) {
-        const monthName = mdyMatch[1].toLowerCase();
-        const day = parseInt(mdyMatch[2]);
-        const year = mdyMatch[3] ? parseInt(mdyMatch[3]) : new Date().getFullYear();
-        const month = MONTH_MAP[monthName];
-
-        let d = startOfToday();
-        d = setYear(d, year);
-        d = setMonth(d, month);
-        d = setDayOfMonth(d, day);
-
-        if (isValid(d)) {
-            return { date: format(d, 'yyyy-MM-dd'), phrase: mdyMatch[0] };
-        }
-    }
-
-    return null;
-}
-
 function extractDate(text: string): { date: string; cleaned: string } {
-    const lowerText = text.toLowerCase();
-    
-    // 1. Check simple words first (today, yesterday)
+    let remaining = text;
     for (const [phrase, fn] of Object.entries(DATE_WORDS)) {
-        if (new RegExp(`\\b${phrase}\\b`, 'i').test(text)) {
-            return { date: fn(), cleaned: text.replace(new RegExp(`\\b${phrase}\\b`, 'i'), '').trim() };
+        if (remaining.toLowerCase().includes(phrase)) {
+            remaining = remaining.toLowerCase().replace(phrase, '').trim();
+            return { date: fn(), cleaned: remaining };
         }
     }
-
-    // 2. Check for broad relative periods specifically to avoid regex collision
-    const relativePeriods = ['last week', 'last month', 'this month', 'last year', 'this year'];
-    for (const period of relativePeriods) {
-        if (new RegExp(`\\b${period}\\b`, 'i').test(text)) {
-            return { date: getRelativeDate(period)!, cleaned: text.replace(new RegExp(`\\b${period}\\b`, 'i'), '').trim() };
-        }
-    }
-
-    // 3. Check for absolute dates like "25th oct 2025"
-    const absDate = getAbsoluteDate(text);
-    if (absDate) {
-        return { date: absDate.date, cleaned: text.replace(new RegExp(absDate.phrase, 'i'), '').trim() };
-    }
-
-    // 4. Check relative days like "last friday", "friday"
-    const relativeRegex = /\b(last|this|next)?\s*(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/gi;
-    const match = text.match(relativeRegex);
-    if (match) {
-        const phrase = match[0];
-        const date = getRelativeDate(phrase);
-        if (date) {
-            return { date, cleaned: text.replace(phrase, '').trim() };
-        }
-    }
-
-    return { date: format(startOfToday(), 'yyyy-MM-dd'), cleaned: text };
+    return { date: new Date().toISOString().slice(0, 10), cleaned: text };
 }
 
 function fuzzyMatch(input: string, candidates: string[]): string | undefined {
@@ -287,22 +153,22 @@ export function parseTransactionMessage(
     let to_account_name: string | undefined;
 
     // "from X to Y" pattern
-    const fromToMatch = cleaned.match(/\b(from|by)\s+(.+?)\s+(to|in|into)\s+(.+?)(?:\s|$)/i);
+    const fromToMatch = cleaned.match(/from\s+(.+?)\s+to\s+(.+?)(?:\s|$)/i);
     if (fromToMatch) {
-        from_account_name = fuzzyMatch(fromToMatch[2], accountNames);
-        to_account_name = fuzzyMatch(fromToMatch[4], accountNames);
+        from_account_name = fuzzyMatch(fromToMatch[1], accountNames);
+        to_account_name = fuzzyMatch(fromToMatch[2], accountNames);
     } else {
-        // "to X" / "in X" pattern (income destination / transfer to)
-        const toMatch = cleaned.match(/\b(to|in|into)\s+(.+?)(?:\s|$)/i);
+        // "to X" pattern (income destination)
+        const toMatch = cleaned.match(/\bto\s+(.+?)(?:\s|$)/i);
         if (toMatch) {
-            const matched = fuzzyMatch(toMatch[2], accountNames);
-            if (type === 'income' || type === 'transfer') to_account_name = matched;
-            else if (type === 'expense' && !from_account_name) from_account_name = matched; // e.g., "momo 200 in cash"
+            const matched = fuzzyMatch(toMatch[1], accountNames);
+            if (type === 'income') to_account_name = matched;
+            else if (type === 'transfer') to_account_name = matched;
         }
-        // "from X" / "by X" pattern (expense source)
-        const fromMatch = cleaned.match(/\b(from|by|at)\s+(.+?)(?:\s|$)/i);
+        // "from X" pattern (expense source)
+        const fromMatch = cleaned.match(/\bfrom\s+(.+?)(?:\s|$)/i);
         if (fromMatch && !fromToMatch) {
-            from_account_name = fuzzyMatch(fromMatch[2], accountNames);
+            from_account_name = fuzzyMatch(fromMatch[1], accountNames);
         }
     }
 
@@ -310,12 +176,11 @@ export function parseTransactionMessage(
     const category_keyword = detectCategory(cleaned);
 
     // 6. Build note from remaining meaningful words
+    const stripWords = ['from', 'to', amount.toString(), date, 'transfer', 'send'];
     let note = cleaned
-        .replace(/\b\d[\d,]*(?:\.\d+)?\s*k?\b/i, '') // strip amount
-        .replace(/\b(from|to|on|at|for|by|in|into)\s+\S+/gi, '') // strip prepositions and following word
-        .replace(/\b(today|yesterday|last week|last month|this month|last year|this year)\b/gi, '')
-        .replace(/\b(on|at|for|by|in|into)\b/gi, '') // strip hanging prepositions
-        .replace(/\s+/g, ' ')
+        .replace(/\b\d[\d,]*(?:\.\d+)?\s*k?\b/i, '')
+        .replace(/\b(from|to)\s+\S+/gi, '')
+        .replace(/\b(today|yesterday|last week)\b/gi, '')
         .trim();
     if (!note) note = message.trim();
 

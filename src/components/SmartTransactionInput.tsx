@@ -128,24 +128,6 @@ export default function SmartTransactionInput({ accounts, categories, transactio
   useEffect(() => {
     if (input.trim().length > 2) {
       const result = parseTransactionMessage(input, accounts, categories);
-      
-      if (result && transactions) {
-        // 1. Try to resolve the current keyword
-        const directCat = resolveCategory(result.category_keyword, result.type);
-        
-        // 2. If no direct match or high-confidence keyword found, try history
-        if (!directCat || result.confidence !== 'high') {
-          const histMatch = transactions.find(t => 
-            t.type === result.type && 
-            t.note?.toLowerCase().trim() === result.note?.toLowerCase().trim()
-          );
-          if (histMatch) {
-            // Found a past transaction with same note — use its category
-            result.category_keyword = histMatch.category?.name || histMatch.category_name;
-          }
-        }
-      }
-      
       setParsed(result);
     } else {
       setParsed(null);
@@ -157,30 +139,9 @@ export default function SmartTransactionInput({ accounts, categories, transactio
 
   const resolveCategory = (keyword?: string, type?: string) => {
     if (!keyword) return undefined;
-    const kw = keyword.toLowerCase();
-    
-    // Exact or substring match
-    const match = categories?.find(c =>
-      c.type === type && (c.name?.toLowerCase().includes(kw))
+    return categories?.find(c =>
+      c.type === type && (c.name?.toLowerCase().includes(keyword.toLowerCase()))
     );
-    if (match) return match;
-
-    // Hardcoded synonym bridge for common CATEGORY_MAP keys
-    const synonyms: Record<string, string[]> = {
-      food: ['grocery', 'dining', 'eat', 'restaurant', 'meal'],
-      transport: ['taxi', 'fuel', 'commute', 'travel'],
-      shopping: ['amazon', 'clothes', 'purchase'],
-      housing: ['utilities', 'rent', 'home'],
-      health: ['medical', 'doctor', 'pharmacy'],
-    };
-
-    if (synonyms[kw]) {
-      return categories?.find(c => 
-        c.type === type && synonyms[kw].some(s => c.name?.toLowerCase().includes(s))
-      );
-    }
-
-    return undefined;
   };
 
   const handleConfirmParsed = async () => {
