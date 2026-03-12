@@ -16,6 +16,36 @@ import FAB from '@/src/components/FAB';
 
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '631803362356-e9sld8untk9kh2hpgca6em5m3dpvngr3.apps.googleusercontent.com';
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-center bg-[#0A0A0B] min-h-screen flex flex-col items-center justify-center">
+          <h2 className="text-2xl font-bold text-white mb-4">Something went wrong.</h2>
+          <p className="text-zinc-500 mb-6">The dashboard encountered an error while rendering.</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold"
+          >
+            Reload Application
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const { user, loading, login } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -98,22 +128,24 @@ export default function App() {
           <MobileHeader />
 
           <main className="flex-1 lg:ml-64 min-h-screen pb-24 lg:pb-0">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="p-4 lg:p-8"
-              >
-                {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
-                {activeTab === 'transactions' && <Transactions setActiveTab={setActiveTab} />}
-                {activeTab === 'analysis' && <Analysis />}
-                {activeTab === 'donations' && <Donations />}
-                {activeTab === 'settings' && <Settings />}
-              </motion.div>
-            </AnimatePresence>
+            <ErrorBoundary>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="p-4 lg:p-8"
+                >
+                  {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
+                  {activeTab === 'transactions' && <Transactions setActiveTab={setActiveTab} />}
+                  {activeTab === 'analysis' && <Analysis />}
+                  {activeTab === 'donations' && <Donations />}
+                  {activeTab === 'settings' && <Settings />}
+                </motion.div>
+              </AnimatePresence>
+            </ErrorBoundary>
           </main>
 
           <FAB onClick={() => setActiveTab('transactions')} />
