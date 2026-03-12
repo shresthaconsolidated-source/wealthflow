@@ -1,6 +1,6 @@
 import React from 'react';
 import { TrendingUp, ArrowRight } from 'lucide-react';
-import { formatCurrency, cn } from '@/src/lib/utils';
+import { formatCurrency, cn, getCurrencySymbol } from '@/src/lib/utils';
 import type { Forecast } from '@/src/lib/forecastEngine';
 import { buildForecastChartData } from '@/src/lib/forecastEngine';
 import type { MonthlyData } from '@/src/lib/insightsEngine';
@@ -50,16 +50,35 @@ export default function ForecastSection({ forecast, history, compact = false }: 
         <div className="space-y-6">
             {/* Projection Cards */}
             <div className="grid grid-cols-3 gap-3">
-                {cards.map(c => (
-                    <div key={c.label} className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 text-center">
+                {cards.map((c, idx) => (
+                    <div 
+                        key={c.label} 
+                        className={cn(
+                            "relative overflow-hidden border rounded-2xl p-4 text-center transition-all duration-300",
+                            idx === 1 ? "bg-emerald-500/5 border-emerald-500/20 shadow-lg shadow-emerald-500/5" : "bg-white/[0.03] border-white/5"
+                        )}
+                    >
+                        {idx === 1 && (
+                            <div className="absolute top-0 right-0 p-1">
+                                <TrendingUp className="w-3 h-3 text-emerald-500/50" />
+                            </div>
+                        )}
                         <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">{c.label}</p>
-                        <p className="text-white font-bold text-base lg:text-lg">{formatCurrency(c.value)}</p>
+                        <p className="text-white font-bold text-base lg:text-lg">
+                            {getCurrencySymbol()} {Math.round(c.value).toLocaleString()}
+                        </p>
                         <p className={cn(
                             "text-xs font-bold mt-1",
                             c.diff >= 0 ? "text-emerald-400" : "text-red-400"
                         )}>
-                            {c.diff >= 0 ? '+' : ''}{formatCurrency(c.diff)} ({c.diff >= 0 ? '+' : ''}{c.pct}%)
+                            {c.diff >= 0 ? '+' : ''}{getCurrencySymbol()} {Math.round(c.diff).toLocaleString()}
                         </p>
+                        <div className={cn(
+                            "text-[10px] font-medium opacity-80",
+                            c.diff >= 0 ? "text-emerald-500/70" : "text-red-500/70"
+                        )}>
+                            ({c.diff >= 0 ? '+' : ''}{c.pct}%)
+                        </div>
                     </div>
                 ))}
             </div>
@@ -87,7 +106,7 @@ export default function ForecastSection({ forecast, history, compact = false }: 
                         <ComposedChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                             <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} width={40} />
+                            <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} tickFormatter={v => `${getCurrencySymbol()}${(v / 1000).toFixed(0)}k`} width={45} />
                             <Tooltip content={<CustomTooltip />} />
                             <Area dataKey="actual" name="Actual" fill="rgba(52,211,153,0.08)" stroke="#34D399" strokeWidth={2} dot={false} connectNulls />
                             <Line dataKey="conservative" name="Conservative" stroke="#71717a" strokeWidth={1.5} strokeDasharray="4 4" dot={false} connectNulls />
