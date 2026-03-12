@@ -408,6 +408,59 @@ app.delete(["/api/transactions/:id", "/transactions/:id"], async (req, res) => {
   res.json({ success: true });
 });
 
+// BULK transactions
+app.post(["/api/transactions/bulk", "/transactions/bulk"], asyncHandler(async (req: any, res: any) => {
+  const userId = (req as any).user.id;
+  const { transactions } = req.body;
+
+  if (!Array.isArray(transactions)) {
+    return res.status(400).json({ error: "transactions must be an array" });
+  }
+
+  // Use a transaction or sequential inserts (Supabase JS doesn't support full atomicity easily without RPC, so sequential is fine for this scale)
+  const results = [];
+  const errors = [];
+
+  for (const txData of transactions) {
+    try {
+      let { from_account_id, to_account_id, category_id, amount, type, date, note } = txData;
+      
+      if (!to_account_id) to_account_id = null;
+      if (!from_account_id) from_account_id = null;
+      if (!category_id) category_id = null;
+
+      const { data, error } = await supabase.from('transactions').insert({
+        user_id: userId, from_account_id, to_account_id, category_id, amount, type, date, note
+      }).select().single();
+
+      if (error) {
+        errors.push({ note, error: error.message });
+        continue;
+      }
+
+      // Update balances
+      if (type === 'income' && to_account_id) {
+        let { data: acc } = await supabase.from('accounts').select('balance').eq('id', to_account_id).single();
+        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + Number(amount) }).eq('id', to_account_id);
+      } else if (type === 'expense' && from_account_id) {
+        let { data: acc } = await supabase.from('accounts').select('balance').eq('id', from_account_id).single();
+        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - Number(amount) }).eq('id', from_account_id);
+      } else if (type === 'transfer' && from_account_id && to_account_id) {
+        let { data: fromAcc } = await supabase.from('accounts').select('balance').eq('id', from_account_id).single();
+        if (fromAcc) await supabase.from('accounts').update({ balance: Number(fromAcc.balance) - Number(amount) }).eq('id', from_account_id);
+        let { data: toAcc } = await supabase.from('accounts').select('balance').eq('id', to_account_id).single();
+        if (toAcc) await supabase.from('accounts').update({ balance: Number(toAcc.balance) + Number(amount) }).eq('id', to_account_id);
+      }
+
+      results.push(data);
+    } catch (e: any) {
+      errors.push({ note: txData.note, error: e.message });
+    }
+  }
+
+  res.json({ success: true, count: results.length, errors });
+}));
+
 app.get(["/api/user/settings", "/user/settings"], asyncHandler(async (req: any, res: any) => {
   const userId = (req as any).user.id;
   try {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   TrendingUp,
   TrendingDown,
@@ -72,7 +72,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
     { label: 'Total Net Worth', value: data.totalNetWorth, icon: DollarSign, trend: data.totalNetWorth > 0 ? '+Active' : 'Empty', positive: data.totalNetWorth >= 0 },
     { label: 'Monthly Income', value: data.monthlyIncome, icon: TrendingUp, trend: 'This Month', positive: true },
     { label: 'Monthly Expense', value: data.monthlyExpense, icon: TrendingDown, trend: 'This Month', positive: data.monthlyExpense === 0 },
-    { label: 'Savings Rate', value: `${data.savingsRate.toFixed(1)}%`, icon: PieChartIcon, trend: 'This Month', positive: data.savingsRate >= 0 },
+    { label: 'Savings Rate', value: `${(data.savingsRate || 0).toFixed(1)}%`, icon: PieChartIcon, trend: 'This Month', positive: (data.savingsRate || 0) >= 0 },
   ];
 
   const currentMonthLabel = new Date(selectedMonth + '-01').toLocaleString('default', { month: 'short' });
@@ -92,7 +92,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
   }));
   
   // Grouped Account Data
-  const groupedAccounts = React.useMemo(() => {
+  const groupedAccounts = useMemo(() => {
     const groups: Record<string, { label: string, icon: any, color: string, total: number, accounts: any[] }> = {
       bank: { label: 'Bank', icon: CreditCard, color: 'blue-400', total: 0, accounts: [] },
       cash: { label: 'Cash', icon: Wallet, color: 'emerald-400', total: 0, accounts: [] },
@@ -102,7 +102,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
     (data.accounts || []).forEach((acc: any) => {
       const type = acc.type?.toLowerCase() || 'asset';
       const targetGroup = groups[type] || groups.asset;
-      targetGroup.total += Number(acc.balance);
+      targetGroup.total += Number(acc.balance || 0);
       targetGroup.accounts.push(acc);
     });
 
@@ -111,9 +111,9 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
       .sort((a, b) => b[1].total - a[1].total);
   }, [data.accounts]);
 
-  const smartInsights = generateInsights(history);
-  const forecast = history.length >= 2 ? computeForecast(history) : null;
-  const healthScore = computeHealthScore(history, data.accounts || []);
+  const smartInsights = generateInsights(history || []);
+  const forecast = (history || []).length >= 2 ? computeForecast(history) : null;
+  const healthScore = computeHealthScore(history || [], data.accounts || []);
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12 lg:pb-0">
@@ -451,7 +451,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
               <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center">
                 <p className="text-zinc-500 text-sm font-bold uppercase tracking-widest">Total {selectedGroup}s</p>
                 <p className="text-white text-2xl font-bold">
-                  {formatCurrency(groupedAccounts.find(([type]) => type === selectedGroup)?.[1].total || 0)}
+                  {formatCurrency(groupedAccounts.find(([type]) => type === selectedGroup)?.[1]?.total || 0)}
                 </p>
               </div>
             </motion.div>

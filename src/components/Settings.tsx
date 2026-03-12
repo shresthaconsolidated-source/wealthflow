@@ -11,7 +11,11 @@ import {
   Building,
   TrendingUp,
   TrendingDown,
-  ShieldAlert
+  ShieldAlert,
+  Download,
+  Upload,
+  FileSpreadsheet,
+  FileDown
 } from 'lucide-react';
 import { formatCurrency, cn, getCurrencySymbol } from '@/src/lib/utils';
 import { useApi } from '@/src/hooks/useApi';
@@ -149,6 +153,126 @@ export default function Settings() {
       console.error('Failed to save currency setting:', error);
       showError('Failed to save currency preference to the server.');
     }
+  };
+
+  const handleExportCSV = () => {
+    fetchWithAuth('/api/transactions')
+      .then(res => res.json())
+      .then(transactions => {
+        if (!transactions.length) return showError('No transactions to export.');
+        const headers = ['Date', 'Note', 'Type', 'Category', 'From Account', 'To Account', 'Amount'];
+        const csvContent = [
+          headers.join(','),
+          ...transactions.map((t: any) => [
+            t.date || '',
+            `"${(t.note || '').replace(/"/g, '""')}"`,
+            t.type || '',
+            `"${(t.category_name || '').replace(/"/g, '""')}"`,
+            `"${(t.from_account_name || '').replace(/"/g, '""')}"`,
+            `"${(t.to_account_name || '').replace(/"/g, '""')}"`,
+            t.amount || 0
+          ].join(','))
+        ].join('\n');
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `wealthflow_backup_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+      });
+  };
+
+  const downloadTemplate = (type: 'standard' | 'transfer') => {
+    const headers = type === 'standard' 
+      ? ['Date', 'Transaction Detail', 'Type', 'Category', 'Account', 'Amount']
+      : ['Date', 'Transaction Detail', 'Account from', 'Account to', 'Amount'];
+    const csvContent = headers.join(',');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `template_${type}.csv`;
+    a.click();
+  };
+
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>, importType: 'standard' | 'transfer') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+      if (lines.length <= 1) return showError('CSV file is empty or missing data.');
+
+      const dataRows = lines.slice(1);
+      const transactionsToUpload: any[] = [];
+      const importErrors: string[] = [];
+
+      dataRows.forEach((row, index) => {
+        const values = row.split(',').map(v => v.trim().replace(/^"(.*)"$/, '$1'));
+        const rowNum = index + 2;
+
+        if (importType === 'standard') {
+          const [date, note, type, catName, accName, amount] = values;
+          const category = categories.find(c => c.name.toLowerCase() === catName?.toLowerCase());
+          const account = accounts.find(a => a.name.toLowerCase() === accName?.toLowerCase());
+
+          if (!category) importErrors.push(`Row ${rowNum}: Category '${catName}' not found`);
+          if (!account) importErrors.push(`Row ${rowNum}: Account '${accName}' not found`);
+          
+          if (category && account) {
+            transactionsToUpload.push({
+              date, note, type: (type || '').toLowerCase(), 
+              category_id: category.id,
+              from_account_id: type?.toLowerCase() === 'expense' ? account.id : null,
+              to_account_id: type?.toLowerCase() === 'income' ? account.id : null,
+              amount: parseFloat(amount || '0')
+            });
+          }
+        } else {
+          const [date, note, fromAccName, toAccName, amount] = values;
+          const fromAccount = accounts.find(a => a.name.toLowerCase() === fromAccName?.toLowerCase());
+          const toAccount = accounts.find(a => a.name.toLowerCase() === toAccName?.toLowerCase());
+
+          if (!fromAccount) importErrors.push(`Row ${rowNum}: Account From '${fromAccName}' not found`);
+          if (!toAccount) importErrors.push(`Row ${rowNum}: Account To '${toAccName}' not found`);
+
+          if (fromAccount && toAccount) {
+            transactionsToUpload.push({
+              date, note, type: 'transfer',
+              from_account_id: fromAccount.id,
+              to_account_id: toAccount.id,
+              amount: parseFloat(amount || '0')
+            });
+          }
+        }
+      });
+
+      if (importErrors.length > 0) {
+        showError(importErrors.slice(0, 3).join(' | ') + (importErrors.length > 3 ? ` ...and ${importErrors.length - 3} more` : ''));
+        return;
+      }
+
+      try {
+        const res = await fetchWithAuth('/api/transactions/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transactions: transactionsToUpload })
+        });
+        if (res.ok) {
+          fetchData();
+          alert(`Successfully imported ${transactionsToUpload.length} transactions!`);
+        } else {
+          showError('Import failed on server.');
+        }
+      } catch (err: any) {
+        showError(`Import error: ${err.message}`);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const accountSections = [
@@ -381,12 +505,41 @@ export default function Settings() {
             </div>
             <div className="p-8 rounded-3xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/10 flex flex-col justify-between gap-6">
               <div>
-                <p className="text-white font-bold text-base">Data & Privacy</p>
-                <p className="text-zinc-500 text-sm mt-2">Manage how your financial data is stored securely in your private cloud.</p>
+                <p className="text-white font-bold text-base">Import & Export Data</p>
+                <p className="text-zinc-500 text-sm mt-2">Bulk manage your transactions via CSV files. Download templates to get started.</p>
               </div>
-              <button className="text-emerald-400 font-bold text-xs uppercase tracking-widest flex items-center gap-2 hover:text-emerald-300 transition-colors w-fit p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
-                View Privacy Policy <ChevronRight className="w-4 h-4" />
-              </button>
+              <div className="flex flex-wrap gap-4">
+                <div className="flex flex-col gap-2">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Import</span>
+                  <div className="flex gap-2">
+                    <label className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold cursor-pointer hover:bg-emerald-500/20 transition-all">
+                      <Upload className="w-4 h-4" /> Standard CSV
+                      <input type="file" accept=".csv" className="hidden" onChange={e => handleImportCSV(e, 'standard')} />
+                    </label>
+                    <label className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold cursor-pointer hover:bg-blue-500/20 transition-all">
+                      <Upload className="w-4 h-4" /> Transfer CSV
+                      <input type="file" accept=".csv" className="hidden" onChange={e => handleImportCSV(e, 'transfer')} />
+                    </label>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Templates</span>
+                  <div className="flex gap-2">
+                    <button onClick={() => downloadTemplate('standard')} className="p-2 rounded-xl bg-white/5 border border-white/10 text-zinc-400 hover:text-white" title="Standard Template">
+                      <FileSpreadsheet className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => downloadTemplate('transfer')} className="p-2 rounded-xl bg-white/5 border border-white/10 text-zinc-400 hover:text-white" title="Transfer Template">
+                      <FileDown className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2 ml-auto">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Backup</span>
+                  <button onClick={handleExportCSV} className="flex items-center gap-2 px-6 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold hover:bg-white/10 transition-all">
+                    <Download className="w-4 h-4" /> Export All
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
