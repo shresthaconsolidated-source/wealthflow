@@ -749,4 +749,38 @@ app.get(["/api/dashboard/history", "/dashboard/history"], async (req, res) => {
   res.json(result.reverse());
 });
 
+app.post(["/api/maintenance/sync-balances", "/maintenance/sync-balances"], async (req, res) => {
+  const userId = (req as any).user.id;
+  
+  try {
+    const { data: accounts } = await supabase.from('accounts').select('*').eq('user_id', userId);
+    const { data: txs } = await supabase.from('transactions').select('from_account_id, to_account_id, amount, type').eq('user_id', userId);
+
+    if (!accounts) return res.json({ success: true, updated: 0 });
+
+    let updatedCount = 0;
+    for (const acc of accounts) {
+      let netChange = 0;
+      for (const t of (txs || [])) {
+        if (t.type === 'income' && t.to_account_id === acc.id) netChange += Number(t.amount);
+        if (t.type === 'expense' && t.from_account_id === acc.id) netChange -= Number(t.amount);
+        if (t.type === 'transfer') {
+          if (t.to_account_id === acc.id) netChange += Number(t.amount);
+          if (t.from_account_id === acc.id) netChange -= Number(t.amount);
+        }
+      }
+
+      // We don't have a separate initialBalance column, but most corrupted accounts 
+      // are due to the netChange being added multiple times to the current 'balance'.
+      // Resetting to netChange (initial=0) is the most standard 'healing' action.
+      await supabase.from('accounts').update({ balance: netChange }).eq('id', acc.id);
+      updatedCount++;
+    }
+    res.json({ success: true, updated: updatedCount });
+  } catch (e: any) {
+    console.error("Sync Balances error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 export default app;
