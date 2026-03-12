@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   TrendingUp,
   TrendingDown,
@@ -55,44 +55,24 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
   useEffect(() => {
     fetchWithAuth(`/api/dashboard?month=${selectedMonth}`)
       .then(res => res.json())
-      .then(d => {
-        console.log('Dashboard Data:', d);
-        setData(d);
-      })
-      .catch(err => {
-        console.error('Error fetching dashboard data:', err);
-        // Set empty data to prevent infinite loading if the fetch fails
-        setData({ 
-          totalNetWorth: 0, 
-          monthlyIncome: 0, 
-          monthlyExpense: 0, 
-          monthlySavings: 0, 
-          savingsRate: 0, 
-          accounts: [] 
-        });
-      });
+      .then(setData)
+      .catch(console.error);
   }, [selectedMonth, fetchWithAuth]);
 
   useEffect(() => {
     fetchWithAuth('/api/dashboard/history?months=12')
       .then(res => res.json())
-      .then(h => {
-        console.log('Dashboard History:', h);
-        setHistory(Array.isArray(h) ? h : []);
-      })
-      .catch(err => {
-        console.error('Error fetching dashboard history:', err);
-        setHistory([]);
-      });
+      .then(setHistory)
+      .catch(console.error);
   }, [fetchWithAuth]);
 
   if (!data) return <div className="p-8 text-zinc-500">Loading dashboard...</div>;
 
   const kpis = [
-    { label: 'Total Net Worth', value: data?.totalNetWorth ?? 0, icon: DollarSign, trend: (data?.totalNetWorth ?? 0) > 0 ? '+Active' : 'Empty', positive: (data?.totalNetWorth ?? 0) >= 0 },
-    { label: 'Monthly Income', value: data?.monthlyIncome ?? 0, icon: TrendingUp, trend: 'This Month', positive: true },
-    { label: 'Monthly Expense', value: data?.monthlyExpense ?? 0, icon: TrendingDown, trend: 'This Month', positive: (data?.monthlyExpense ?? 0) === 0 },
-    { label: 'Savings Rate', value: `${(data?.savingsRate || 0).toFixed(1)}%`, icon: PieChartIcon, trend: 'This Month', positive: (data?.savingsRate || 0) >= 0 },
+    { label: 'Total Net Worth', value: data.totalNetWorth, icon: DollarSign, trend: data.totalNetWorth > 0 ? '+Active' : 'Empty', positive: data.totalNetWorth >= 0 },
+    { label: 'Monthly Income', value: data.monthlyIncome, icon: TrendingUp, trend: 'This Month', positive: true },
+    { label: 'Monthly Expense', value: data.monthlyExpense, icon: TrendingDown, trend: 'This Month', positive: data.monthlyExpense === 0 },
+    { label: 'Savings Rate', value: `${data.savingsRate.toFixed(1)}%`, icon: PieChartIcon, trend: 'This Month', positive: data.savingsRate >= 0 },
   ];
 
   const currentMonthLabel = new Date(selectedMonth + '-01').toLocaleString('default', { month: 'short' });
@@ -112,7 +92,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
   }));
   
   // Grouped Account Data
-  const groupedAccounts = useMemo(() => {
+  const groupedAccounts = React.useMemo(() => {
     const groups: Record<string, { label: string, icon: any, color: string, total: number, accounts: any[] }> = {
       bank: { label: 'Bank', icon: CreditCard, color: 'blue-400', total: 0, accounts: [] },
       cash: { label: 'Cash', icon: Wallet, color: 'emerald-400', total: 0, accounts: [] },
@@ -122,7 +102,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
     (data.accounts || []).forEach((acc: any) => {
       const type = acc.type?.toLowerCase() || 'asset';
       const targetGroup = groups[type] || groups.asset;
-      targetGroup.total += Number(acc.balance || 0);
+      targetGroup.total += Number(acc.balance);
       targetGroup.accounts.push(acc);
     });
 
@@ -131,12 +111,9 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
       .sort((a, b) => b[1].total - a[1].total);
   }, [data.accounts]);
 
-  const historySafe = Array.isArray(history) ? history : [];
-  const accountsSafe = Array.isArray(data?.accounts) ? data.accounts : [];
-
-  const smartInsights = generateInsights(historySafe);
-  const forecast = historySafe.length >= 2 ? computeForecast(historySafe) : null;
-  const healthScore = computeHealthScore(historySafe, accountsSafe);
+  const smartInsights = generateInsights(history);
+  const forecast = history.length >= 2 ? computeForecast(history) : null;
+  const healthScore = computeHealthScore(history, data.accounts || []);
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12 lg:pb-0">
@@ -448,8 +425,8 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
               </div>
 
               <div className="space-y-4 overflow-y-auto flex-1 pr-2 custom-scrollbar">
-                {(groupedAccounts.find(([type]) => type === selectedGroup)?.[1]?.accounts || [])
-                  .sort((a: any, b: any) => (b.balance || 0) - (a.balance || 0))
+                {groupedAccounts.find(([type]) => type === selectedGroup)?.[1].accounts
+                  .sort((a, b) => b.balance - a.balance)
                   .map((acc: any) => (
                     <div key={acc.id} className="bg-white/5 rounded-2xl p-5 flex items-center justify-between group">
                       <div className="flex items-center gap-4">
@@ -474,7 +451,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
               <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center">
                 <p className="text-zinc-500 text-sm font-bold uppercase tracking-widest">Total {selectedGroup}s</p>
                 <p className="text-white text-2xl font-bold">
-                  {formatCurrency(groupedAccounts.find(([type]) => type === selectedGroup)?.[1]?.total || 0)}
+                  {formatCurrency(groupedAccounts.find(([type]) => type === selectedGroup)?.[1].total || 0)}
                 </p>
               </div>
             </motion.div>
