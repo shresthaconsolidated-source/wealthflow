@@ -19,7 +19,8 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Helper for error handling
 const asyncHandler = (fn: any) => (req: any, res: any, next: any) => {

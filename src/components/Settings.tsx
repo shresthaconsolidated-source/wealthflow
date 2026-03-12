@@ -204,28 +204,25 @@ export default function Settings() {
 
       try {
         const endpoint = isTransfer ? '/api/transactions/import/transfers' : '/api/transactions/import/standard';
-        const res = await fetchWithAuth(endpoint, {
+        await fetchWithAuth(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ rows })
         });
 
-        const result = await res.json();
-        if (res.ok) {
-          setImportStatus({
-            type: 'success',
-            message: `Successfully imported ${result.imported} of ${result.total} ${isTransfer ? 'transfers' : 'transactions'}.`
-          });
-          fetchData();
-        } else {
-          setImportStatus({
-            type: 'error',
-            message: result.error || 'Import failed.',
-            details: result.details
-          });
-        }
+        // Since fetchWithAuth throws on error, getting here means SUCCESS
+        setImportStatus({
+          type: 'success',
+          message: `Successfully imported the ${isTransfer ? 'transfers' : 'transactions'}.`
+        });
+        fetchData();
       } catch (err: any) {
-        setImportStatus({ type: 'error', message: 'Network error during import.' });
+        console.error("CSV Import Error:", err);
+        setImportStatus({ 
+          type: 'error', 
+          message: err.message || 'Import failed.',
+          details: err.data?.details
+        });
       } finally {
         setImporting(false);
         e.target.value = '';
