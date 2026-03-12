@@ -173,6 +173,7 @@ export default function AdminPulse({ onBack }: { onBack: () => void }) {
                   <th className="px-8 py-6 text-zinc-500 text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">Joined</th>
                   <th className="px-8 py-6 text-zinc-500 text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">Last Active</th>
                   <th className="px-8 py-6 text-zinc-500 text-[10px] font-bold uppercase tracking-widest text-right whitespace-nowrap">Activity Today</th>
+                  <th className="px-8 py-6 text-zinc-500 text-[10px] font-bold uppercase tracking-widest text-right whitespace-nowrap">Total Transactions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -202,6 +203,11 @@ export default function AdminPulse({ onBack }: { onBack: () => void }) {
                         u.todayCount > 0 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-zinc-500/10 text-zinc-500"
                       )}>
                         {u.todayCount} TXs
+                      </span>
+                    </td>
+                    <td className="px-8 py-5 text-right whitespace-nowrap">
+                      <span className="text-zinc-400 font-medium">
+                        {u.totalCount}
                       </span>
                     </td>
                   </tr>
