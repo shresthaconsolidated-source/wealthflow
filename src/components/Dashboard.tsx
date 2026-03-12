@@ -448,8 +448,8 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
               </div>
 
               <div className="space-y-4 overflow-y-auto flex-1 pr-2 custom-scrollbar">
-                {groupedAccounts.find(([type]) => type === selectedGroup)?.[1]?.accounts
-                  ?.sort((a: any, b: any) => (b.balance || 0) - (a.balance || 0))
+                {(groupedAccounts.find(([type]) => type === selectedGroup)?.[1]?.accounts || [])
+                  .sort((a: any, b: any) => (b.balance || 0) - (a.balance || 0))
                   .map((acc: any) => (
                     <div key={acc.id} className="bg-white/5 rounded-2xl p-5 flex items-center justify-between group">
                       <div className="flex items-center gap-4">
