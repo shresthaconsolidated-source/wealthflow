@@ -517,16 +517,6 @@ app.get(["/api/transactions/export", "/transactions/export"], asyncHandler(async
 }));
 
 
-// Global error handler (must be last)
-app.use((err: any, req: any, res: any, next: any) => {
-  console.error("GLOBAL ERROR CAPTURED:", err.stack || err);
-  res.status(500).json({ 
-    error: "A server crash was prevented.", 
-    message: err.message,
-    stack: process.env.NODE_ENV === 'production' ? null : err.stack 
-  });
-});
-
 // Admin Stats - Restricted to ADMIN_EMAILS
 app.get(["/api/admin/stats", "/admin/stats"], asyncHandler(async (req: any, res: any) => {
   const user = req.user;
@@ -543,18 +533,20 @@ app.get(["/api/admin/stats", "/admin/stats"], asyncHandler(async (req: any, res:
   // Calculate daily activity
   const now = new Date();
   const today = now.toISOString().split('T')[0];
-  const yesterday = new Date(now.getTime() - 86400000).toISOString().split('T')[0];
 
   const stats = (users || []).map(u => {
     const userTxs = (transactions || []).filter(t => t.user_id === u.id);
     const todayCount = userTxs.filter(t => (t.created_at || t.date).startsWith(today)).length;
     const totalCount = userTxs.length;
 
+    // Sort userTxs by date to find most recent
+    const sortedTxs = userTxs.sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+
     return {
       ...u,
       todayCount,
       totalCount,
-      lastActive: userTxs.length > 0 ? (userTxs[0].created_at || userTxs[0].date) : u.created_at
+      lastActive: sortedTxs.length > 0 ? (sortedTxs[0].created_at || sortedTxs[0].date) : u.created_at
     };
   });
 
@@ -564,6 +556,16 @@ app.get(["/api/admin/stats", "/admin/stats"], asyncHandler(async (req: any, res:
     users: stats
   });
 }));
+
+// Global error handler (must be last)
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("GLOBAL ERROR CAPTURED:", err.stack || err);
+  res.status(500).json({ 
+    error: "A server crash was prevented.", 
+    message: err.message,
+    stack: process.env.NODE_ENV === 'production' ? null : err.stack 
+  });
+});
 
 app.get(["/api/dashboard", "/dashboard"], async (req, res) => {
   const userId = (req as any).user.id;
