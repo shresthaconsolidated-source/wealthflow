@@ -168,9 +168,12 @@ app.post(["/api/accounts", "/accounts"], async (req, res) => {
 
   let finalBalance = Number(initial_balance || 0);
 
-  const { data: existing } = await supabase.from('accounts').select('id').eq('id', id).eq('user_id', userId).single();
+  const { data: existing } = await supabase.from('accounts').select('id, balance').eq('id', id).eq('user_id', userId).single();
   
   if (existing) {
+    // If the account exists, the user is editing it.
+    // They are providing a new 'initial_balance'.
+    // The current balance = new initial_balance + sum of all historical net changes
     const { data: txs } = await supabase
       .from('transactions')
       .select('from_account_id, to_account_id, amount, type')
@@ -185,6 +188,7 @@ app.post(["/api/accounts", "/accounts"], async (req, res) => {
         if (t.from_account_id === id) netChange -= Number(t.amount);
       }
     }
+    // Set the actual db balance to the new initial base + all historical activity
     finalBalance = Number(initial_balance) + netChange;
   }
 
