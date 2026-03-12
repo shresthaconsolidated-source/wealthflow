@@ -14,7 +14,11 @@ import {
   setMonth,
   setYear,
   setDay as setDayOfWeek,
-  setDate as setDayOfMonth
+  setDate as setDayOfMonth,
+  subMonths,
+  subYears,
+  startOfMonth,
+  startOfYear
 } from 'date-fns';
 
 type Day = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -97,6 +101,10 @@ function getRelativeDate(phrase: string): string | null {
     const today = startOfToday();
 
     if (lower === 'last week') return format(subDays(today, 7), 'yyyy-MM-dd');
+    if (lower === 'last month') return format(subMonths(today, 1), 'yyyy-MM-dd');
+    if (lower === 'this month') return format(startOfMonth(today), 'yyyy-MM-dd');
+    if (lower === 'last year') return format(subYears(today, 1), 'yyyy-MM-dd');
+    if (lower === 'this year') return format(startOfYear(today), 'yyyy-MM-dd');
 
     // Handle "last Friday", "this Monday", "next Friday"
     const match = lower.match(/^(?:(last|this|next)\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)$/);
@@ -198,9 +206,12 @@ function extractDate(text: string): { date: string; cleaned: string } {
         }
     }
 
-    // 2. Check for "last week" specifically
-    if (/\blast week\b/i.test(text)) {
-        return { date: getRelativeDate('last week')!, cleaned: text.replace(/last week/i, '').trim() };
+    // 2. Check for broad relative periods specifically to avoid regex collision
+    const relativePeriods = ['last week', 'last month', 'this month', 'last year', 'this year'];
+    for (const period of relativePeriods) {
+        if (new RegExp(`\\b${period}\\b`, 'i').test(text)) {
+            return { date: getRelativeDate(period)!, cleaned: text.replace(new RegExp(`\\b${period}\\b`, 'i'), '').trim() };
+        }
     }
 
     // 3. Check for absolute dates like "25th oct 2025"
@@ -302,7 +313,7 @@ export function parseTransactionMessage(
     let note = cleaned
         .replace(/\b\d[\d,]*(?:\.\d+)?\s*k?\b/i, '') // strip amount
         .replace(/\b(from|to|on|at|for|by|in|into)\s+\S+/gi, '') // strip prepositions and following word
-        .replace(/\b(today|yesterday|last week)\b/gi, '')
+        .replace(/\b(today|yesterday|last week|last month|this month|last year|this year)\b/gi, '')
         .replace(/\b(on|at|for|by|in|into)\b/gi, '') // strip hanging prepositions
         .replace(/\s+/g, ' ')
         .trim();
