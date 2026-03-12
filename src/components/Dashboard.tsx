@@ -22,7 +22,7 @@ import {
   PieChart,
   Pie
 } from 'recharts';
-import { formatCurrency, cn } from '@/src/lib/utils';
+import { formatCurrency, cn, getCurrencySymbol } from '@/src/lib/utils';
 import { motion } from 'motion/react';
 import { useApi } from '@/src/hooks/useApi';
 import InsightCards from './InsightCards';
@@ -185,7 +185,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: '#71717a', fontSize: 10 }}
-                    tickFormatter={(val) => `$${val / 1000}k`}
+                    tickFormatter={(val) => `${getCurrencySymbol()}${val / 1000}k`}
                     width={35}
                   />
                   <Tooltip
@@ -307,7 +307,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: '#71717a', fontSize: 10 }}
-                    tickFormatter={(val) => `$${val / 1000}k`}
+                    tickFormatter={(val) => `${getCurrencySymbol()}${val / 1000}k`}
                     width={35}
                   />
                   <Tooltip

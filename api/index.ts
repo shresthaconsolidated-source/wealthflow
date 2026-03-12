@@ -21,6 +21,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
 const app = express();
 app.use(express.json());
 
+// Helper for error handling
+const asyncHandler = (fn: any) => (req: any, res: any, next: any) => {
+  return Promise.resolve(fn(req, res, next)).catch(next);
+};
+
 // Middleware to authenticate /api requests via JWT (skipping auth endpoints)
 app.use((req, res, next) => {
   const isApiRoute = req.path.startsWith('/api/') || req.path.startsWith('/auth/');
@@ -401,6 +406,61 @@ app.delete(["/api/transactions/:id", "/transactions/:id"], async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
+});
+
+app.get(["/api/user/settings", "/user/settings"], asyncHandler(async (req: any, res: any) => {
+  const userId = (req as any).user.id;
+  try {
+    const { data, error } = await supabase
+      .from('user_settings')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error fetching user settings:", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(data || { base_currency: 'USD' });
+  } catch (err: any) {
+    console.error("Unexpected error fetching user settings:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}));
+
+app.post(["/api/user/settings", "/user/settings"], asyncHandler(async (req: any, res: any) => {
+  const userId = (req as any).user.id;
+  const { base_currency } = req.body;
+
+  if (!base_currency) {
+    return res.status(400).json({ error: "base_currency is required" });
+  }
+
+  try {
+    const { error } = await supabase
+      .from('user_settings')
+      .upsert({ user_id: userId, base_currency }, { onConflict: 'user_id' });
+
+    if (error) {
+      console.error("Error saving user settings:", error);
+      return res.status(500).json({ error: error.message });
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Unexpected error saving user settings:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}));
+
+// Global error handler (must be last)
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("GLOBAL ERROR CAPTURED:", err.stack || err);
+  res.status(500).json({ 
+    error: "A server crash was prevented.", 
+    message: err.message,
+    stack: process.env.NODE_ENV === 'production' ? null : err.stack 
+  });
 });
 
 app.get(["/api/dashboard", "/dashboard"], async (req, res) => {

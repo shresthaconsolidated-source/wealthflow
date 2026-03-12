@@ -13,7 +13,7 @@ import {
   TrendingDown,
   ShieldAlert
 } from 'lucide-react';
-import { formatCurrency, cn } from '@/src/lib/utils';
+import { formatCurrency, cn, getCurrencySymbol } from '@/src/lib/utils';
 import { useApi } from '@/src/hooks/useApi';
 
 export default function Settings() {
@@ -29,6 +29,7 @@ export default function Settings() {
 
   const [activeAccountTab, setActiveAccountTab] = useState<'bank' | 'cash' | 'asset'>('bank');
   const [activeCategoryTab, setActiveCategoryTab] = useState<'income' | 'expense'>('income');
+  const [baseCurrency, setBaseCurrency] = useState('USD');
 
   const { fetchWithAuth } = useApi();
 
@@ -40,10 +41,15 @@ export default function Settings() {
   const fetchData = useCallback(() => {
     Promise.all([
       fetchWithAuth('/api/accounts').then(res => res.json()),
-      fetchWithAuth('/api/categories').then(res => res.json())
-    ]).then(([accs, cats]) => {
+      fetchWithAuth('/api/categories').then(res => res.json()),
+      fetchWithAuth('/api/user/settings').then(res => res.json())
+    ]).then(([accs, cats, settings]) => {
       setAccounts(accs);
       setCategories(cats);
+      if (settings?.base_currency) {
+        setBaseCurrency(settings.base_currency);
+        localStorage.setItem('base_currency', settings.base_currency);
+      }
       setLoading(false);
     }).catch(console.error);
   }, [fetchWithAuth]);
@@ -127,6 +133,21 @@ export default function Settings() {
     } catch (error: any) {
       console.error('Save item error:', error);
       showError(`Save failed: ${error.message || 'Network error'}`);
+    }
+  };
+
+  const handleCurrencyChange = async (newCurrency: string) => {
+    setBaseCurrency(newCurrency);
+    localStorage.setItem('base_currency', newCurrency);
+    try {
+      await fetchWithAuth('/api/user/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base_currency: newCurrency })
+      });
+    } catch (error) {
+      console.error('Failed to save currency setting:', error);
+      showError('Failed to save currency preference to the server.');
     }
   };
 
@@ -346,7 +367,11 @@ export default function Settings() {
                 <p className="text-white font-bold text-base">Base Currency</p>
                 <p className="text-zinc-500 text-sm mt-2">All calculations will be shown in this currency across your dashboard.</p>
               </div>
-              <select className="bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-indigo-500/50 text-sm font-bold appearance-none w-full transition-colors">
+              <select 
+                value={baseCurrency}
+                onChange={e => handleCurrencyChange(e.target.value)}
+                className="bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-indigo-500/50 text-sm font-bold appearance-none w-full transition-colors"
+              >
                 <option value="USD">USD ($)</option>
                 <option value="EUR">EUR (€)</option>
                 <option value="GBP">GBP (£)</option>
@@ -417,7 +442,7 @@ export default function Settings() {
                 <div>
                   <label className="block text-zinc-400 text-xs font-bold uppercase tracking-widest mb-3">Initial Balance</label>
                   <div className="relative">
-                    <span className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</span>
+                    <span className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">{getCurrencySymbol()}</span>
                     <input
                       type="number"
                       step="0.01"
