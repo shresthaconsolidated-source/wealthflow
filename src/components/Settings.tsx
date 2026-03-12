@@ -254,9 +254,9 @@ export default function Settings() {
   };
 
   const accountSections = [
-    { id: 'bank', title: 'Bank Accounts', description: 'Chequing and savings accounts.', items: accounts.filter(a => a.type === 'bank'), icon: Building, type: 'accounts', defaultSubType: 'bank' },
-    { id: 'cash', title: 'Cash', description: 'Physical cash and wallets.', items: accounts.filter(a => a.type === 'cash'), icon: Wallet, type: 'accounts', defaultSubType: 'cash' },
-    { id: 'asset', title: 'Investments & Assets', description: 'Stocks, bonds, and other assets.', items: accounts.filter(a => a.type === 'asset'), icon: Briefcase, type: 'accounts', defaultSubType: 'asset' }
+    { id: 'bank', title: 'Bank Accounts', description: 'Chequing and savings accounts.', items: accounts.filter(a => a.type === 'bank' || a.type === 'savings'), icon: Building, type: 'accounts', defaultSubType: 'bank' },
+    { id: 'cash', title: 'Cash', description: 'Physical cash and wallets.', items: accounts.filter(a => a.type === 'cash' || a.type === 'wallet'), icon: Wallet, type: 'accounts', defaultSubType: 'cash' },
+    { id: 'asset', title: 'Investments & Assets', description: 'Stocks, bonds, and other assets.', items: accounts.filter(a => a.type === 'asset' || a.type === 'investment' || a.type === 'property'), icon: Briefcase, type: 'accounts', defaultSubType: 'asset' }
   ];
 
   const categorySections = [
