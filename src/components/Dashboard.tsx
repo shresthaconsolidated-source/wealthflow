@@ -47,6 +47,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
   const [data, setData] = useState<any>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [chartRange, setChartRange] = useState<number>(6);
+  const [flowChartRange, setFlowChartRange] = useState<number>(6);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const { fetchWithAuth } = useApi();
 
@@ -121,9 +122,11 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
     value: Number(h.netWorth || 0)
   }));
 
-  const flowData = monthlyIncome > 0 || monthlyExpense > 0
-    ? [{ month: currentMonthLabel, income: monthlyIncome, expense: monthlyExpense }]
-    : [];
+  const flowData = (history || []).slice(-flowChartRange).map((h) => ({
+    month: h.label || 'N/A',
+    income: Number(h.income || 0),
+    expense: Number(h.expense || 0)
+  }));
 
   const assetData = accounts.filter((a: any) => Number(a.balance) > 0).map((a: any) => ({
     name: a.name || 'Account', value: Number(a.balance)
@@ -307,8 +310,19 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
       {/* Income vs Expense */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
         <div className="bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8">
-          <h3 className="text-lg lg:text-xl font-bold text-white mb-8">Income vs Expenses</h3>
-          <div className="h-[250px] lg:h-[300px] w-full">
+          <div className="flex justify-between items-center mb-8">
+            <h3 className="text-lg lg:text-xl font-bold text-white">Income vs Expenses</h3>
+            <select
+              value={flowChartRange}
+              onChange={(e) => setFlowChartRange(Number(e.target.value))}
+              className="px-3 py-1.5 rounded-lg bg-emerald-400/10 text-emerald-400 text-xs font-bold uppercase tracking-wider border border-emerald-400/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer"
+            >
+              <option value={6}>6 Months</option>
+              <option value={12}>1 Year</option>
+              <option value={24}>2 Years</option>
+            </select>
+          </div>
+          <div className="h-[250px] lg:h-[300px] w-full mt-auto">
             {flowData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={flowData}>
