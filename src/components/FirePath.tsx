@@ -383,7 +383,7 @@ export default function FirePath({ history, accounts }: Props) {
         <div className="bg-orange-500/5 border border-orange-500/10 rounded-[32px] p-8 flex flex-col justify-center text-center space-y-3">
             <h3 className="text-orange-400 font-black text-xl tracking-tight italic">Rule of Thumb</h3>
             <p className="text-zinc-300 text-sm leading-relaxed max-w-sm mx-auto">
-                If your target monthly spend is {formatCurrency(avgExpenses)}, you need a retirement corpus of approximately 
+                If your target monthly spend is {formatCurrency(effectiveExpenses)}, you need a retirement corpus of approximately 
                 <span className="text-white font-black block text-2xl mt-2">{formatCurrency(targetNetWorthReal)}</span>
                 in today's money to never have to work again.
             </p>
