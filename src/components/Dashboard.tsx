@@ -366,42 +366,51 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
 
         {data.budgets && data.budgets.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {data.budgets.map((budget: any) => {
-              const percent = Math.min((budget.spent / budget.limit) * 100, 100);
-              const isOver = budget.spent > budget.limit;
-              const cat = budget.categories || { name: 'Uncategorized', icon: 'Tag', color: '#71717a' };
+            {data.budgets
+              .sort((a: any, b: any) => (a.is_global ? -1 : 1))
+              .map((budget: any) => {
+                const percent = Math.min((budget.spent / budget.limit) * 100, 100);
+                const isOver = budget.spent > budget.limit;
+                const isGlobal = budget.is_global;
+                const cat = budget.categories || { name: 'All Expenses', icon: 'Target', color: '#10b981' };
 
-              return (
-                <div key={budget.id} className="bg-white/5 rounded-2xl p-5 border border-white/5">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center" style={{ color: cat.color }}>
-                        <Target className="w-5 h-5" />
+                return (
+                  <div key={budget.id} className={cn(
+                    "bg-white/5 rounded-2xl p-5 border",
+                    isGlobal ? "border-emerald-500/30 bg-emerald-500/5 shadow-lg shadow-emerald-500/5" : "border-white/5"
+                  )}>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center",
+                          isGlobal ? "bg-emerald-500/20" : "bg-black/20"
+                        )} style={!isGlobal ? { color: cat.color } : {}}>
+                          <Target className={cn("w-5 h-5", isGlobal ? "text-emerald-400" : "")} />
+                        </div>
+                        <div>
+                          <p className="text-white font-bold text-sm">{isGlobal ? 'All Expenses' : cat.name}</p>
+                          <p className="text-zinc-500 text-[10px] uppercase tracking-widest">{isOver ? 'Over Budget' : isGlobal ? 'Total Monthly Limit' : 'On Track'}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-white font-bold text-sm">{cat.name}</p>
-                        <p className="text-zinc-500 text-[10px] uppercase tracking-widest">{isOver ? 'Over Budget' : 'On Track'}</p>
+                      <div className="text-right">
+                        <p className="text-white font-bold text-sm">{formatCurrency(budget.spent)}</p>
+                        <p className="text-zinc-500 text-[10px]">of {formatCurrency(budget.limit)}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-white font-bold text-sm">{formatCurrency(budget.spent)}</p>
-                      <p className="text-zinc-500 text-[10px]">of {formatCurrency(budget.limit)}</p>
+                    
+                    <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percent}%` }}
+                        className={cn(
+                          "h-full rounded-full",
+                          isOver ? "bg-red-500" : percent > 80 ? "bg-amber-500" : "bg-emerald-500"
+                        )}
+                      />
                     </div>
                   </div>
-                  
-                  <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${percent}%` }}
-                      className={cn(
-                        "h-full rounded-full",
-                        isOver ? "bg-red-500" : percent > 80 ? "bg-amber-500" : "bg-emerald-500"
-                      )}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 border border-dashed border-white/10 rounded-[24px] text-zinc-500">

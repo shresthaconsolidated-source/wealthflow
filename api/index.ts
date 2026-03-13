@@ -710,13 +710,23 @@ app.get(["/api/dashboard", "/dashboard"], async (req, res) => {
     .eq('user_id', userId);
 
   const budgetProgress = (budgets || []).map(b => {
-    const spent = (transactions || [])
-      .filter((t: any) => t.type === 'expense' && t.category_id === b.category_id)
-      .reduce((s: number, t: any) => s + convert(Number(t.amount), t.currency), 0);
+    let spent = 0;
+    if (b.category_id) {
+      spent = (transactions || [])
+        .filter((t: any) => t.type === 'expense' && t.category_id === b.category_id)
+        .reduce((s: number, t: any) => s + convert(Number(t.amount), t.currency), 0);
+    } else {
+      // Global Budget (All Expenses)
+      spent = (transactions || [])
+        .filter((t: any) => t.type === 'expense')
+        .reduce((s: number, t: any) => s + convert(Number(t.amount), t.currency), 0);
+    }
+    
     return {
       ...b,
       spent,
-      limit: Number(b.amount_limit)
+      limit: Number(b.amount_limit),
+      is_global: !b.category_id
     };
   });
 

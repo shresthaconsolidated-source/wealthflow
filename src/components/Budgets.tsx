@@ -62,10 +62,14 @@ export default function Budgets() {
   }, [transactions]);
 
   const spendingByCategory = React.useMemo(() => {
-    const totals: Record<string, number> = {};
+    const totals: Record<string, number> = { __global: 0 };
     currentMonthTransactions.forEach(t => {
-      if (t.type === 'expense' && t.category_id) {
-        totals[t.category_id] = (totals[t.category_id] || 0) + Number(t.amount_base || t.amount);
+      if (t.type === 'expense') {
+        const amount = Number(t.amount_base || t.amount);
+        totals.__global += amount;
+        if (t.category_id) {
+          totals[t.category_id] = (totals[t.category_id] || 0) + amount;
+        }
       }
     });
     return totals;
@@ -77,15 +81,15 @@ export default function Budgets() {
     setIsSubmitting(true);
 
     try {
-      const payload = {
-        category_id: formData.category_id,
+      const payload: any = {
+        category_id: formData.category_id || null,
         amount_limit: parseFloat(formData.amount_limit)
       };
 
-      // Check if trying to add duplicate budget for category
-      const existing = budgets.find(b => b.category_id === formData.category_id);
+      // Check if trying to add duplicate budget for category (including global)
+      const existing = budgets.find(b => b.category_id === (formData.category_id || null));
       if (existing) {
-        payload['id'] = existing.id; // Update instead if it exists
+        payload['id'] = existing.id;
       }
 
       const res = await fetchWithAuth('/api/budgets', {
@@ -96,7 +100,7 @@ export default function Budgets() {
       if (res.ok) {
         setShowAddModal(false);
         setFormData({ category_id: '', amount_limit: '' });
-        fetchData(); // Refresh all
+        fetchData();
       }
     } catch (err) {
       console.error(err);
@@ -168,7 +172,8 @@ export default function Budgets() {
           </div>
         ) : (
           budgets.map(budget => {
-            const spent = spendingByCategory[budget.category_id] || 0;
+            const isGlobal = !budget.category_id;
+            const spent = isGlobal ? spendingByCategory.__global : (spendingByCategory[budget.category_id] || 0);
             const limit = Number(budget.amount_limit);
             const percent = limit > 0 ? (spent / limit) * 100 : 0;
             const isOver = percent > 100;
@@ -177,7 +182,7 @@ export default function Budgets() {
             
             // Find category to get name/icon if populated, otherwise fallback
             const categoryData = categories.find(c => c.id === budget.category_id) || budget.categories;
-            const categoryName = categoryData?.name || 'Unknown Category';
+            const categoryName = isGlobal ? 'All Expenses' : (categoryData?.name || 'Unknown Category');
 
             return (
               <motion.div 
@@ -200,7 +205,10 @@ export default function Budgets() {
 
                 <div className="flex justify-between items-start mb-6 relative z-10">
                   <div>
-                    <h3 className="text-lg font-bold text-white tracking-tight">{categoryName}</h3>
+                    <h3 className="text-lg font-bold text-white tracking-tight">
+                      {isGlobal && <Target className="w-4 h-4 inline mr-2 text-emerald-400" />}
+                      {categoryName}
+                    </h3>
                     <p className="text-xs text-zinc-500 font-medium uppercase tracking-widest mt-1">Monthly Limit</p>
                   </div>
                   <button
@@ -291,10 +299,12 @@ export default function Budgets() {
                   onChange={e => setFormData({ ...formData, category_id: e.target.value })}
                   className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-emerald-500/50 transition-colors appearance-none"
                 >
-                  <option value="" disabled>Select Category</option>
+                  <option value="">All Expenses (Total Monthly Budget)</option>
+                  <optgroup label="Categories">
                   {expenseCategories.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
+                  </optgroup>
                 </select>
               </div>
               
