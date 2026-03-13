@@ -6,7 +6,8 @@ import {
   TrendingUp,
   LogOut,
   Wallet,
-  Heart
+  Heart,
+  MessageCircle
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -25,6 +26,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     { id: 'analysis', label: 'Analysis', icon: TrendingUp },
     { id: 'donations', label: 'Donations', icon: Heart },
     { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'contact', label: 'Contact', icon: MessageCircle },
   ];
 
   return (

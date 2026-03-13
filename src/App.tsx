@@ -7,6 +7,7 @@ import Analysis from '@/src/components/Analysis';
 import Settings from '@/src/components/Settings';
 import Donations from '@/src/components/Donations';
 import AdminPulse from '@/src/components/AdminPulse';
+import Contact from '@/src/components/Contact';
 import { Wallet, Shield, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -135,6 +136,7 @@ export default function App() {
                 {activeTab === 'analysis' && <Analysis />}
                 {activeTab === 'donations' && <Donations />}
                 {activeTab === 'settings' && <Settings />}
+                {activeTab === 'contact' && <Contact />}
               </motion.div>
             </AnimatePresence>
           </main>

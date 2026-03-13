@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ArrowLeftRight, PieChart, Settings, Heart } from 'lucide-react';
+import { LayoutDashboard, ArrowLeftRight, PieChart, Settings, Heart, MessageCircle } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 
 interface MobileBottomNavProps {
@@ -14,6 +14,7 @@ export default function MobileBottomNav({ activeTab, setActiveTab }: MobileBotto
     { id: 'analysis', label: 'Insights', icon: PieChart },
     { id: 'donations', label: 'Donations', icon: Heart },
     { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'contact', label: 'Contact', icon: MessageCircle },
   ];
 
   return (
