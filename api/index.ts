@@ -65,6 +65,31 @@ app.use((req, res, next) => {
   return res.status(401).json({ error: "Unauthorized access. No valid session." });
 });
 
+let cachedRates: any = null;
+let lastRatesFetch = 0;
+
+async function getExchangeRates() {
+  const now = Date.now();
+  if (cachedRates && (now - lastRatesFetch < 12 * 60 * 60 * 1000)) return cachedRates; // 12 hours
+  try {
+    const response = await fetch('https://open.er-api.com/v6/latest/USD');
+    const data = await response.json();
+    if (data && data.rates) {
+      cachedRates = data.rates;
+      lastRatesFetch = now;
+      return cachedRates;
+    }
+  } catch (err) {
+    console.error('Failed to fetch exchange rates', err);
+  }
+  return cachedRates || { USD: 1, EUR: 0.85, GBP: 0.75, INR: 82.5, NPR: 132.5 };
+}
+
+app.get(["/api/exchange-rates", "/exchange-rates"], async (req, res) => {
+  const rates = await getExchangeRates();
+  res.json(rates);
+});
+
 // Auth Route
 app.post(["/api/auth/google", "/auth/google"], async (req, res) => {
   const { token } = req.body;
@@ -98,12 +123,7 @@ app.post(["/api/auth/google", "/auth/google"], async (req, res) => {
         picture
       });
 
-      // Seed default accounts
-      const defaultAccounts = [
-        { id: 'acc-1-' + googleId, user_id: googleId, name: 'Main Bank', type: 'bank', balance: 0, icon: 'Wallet', color: '#3b82f6' },
-        { id: 'acc-2-' + googleId, user_id: googleId, name: 'Cash', type: 'cash', balance: 0, icon: 'DollarSign', color: '#10b981' },
-        { id: 'acc-3-' + googleId, user_id: googleId, name: 'Fixed Deposits', type: 'asset', balance: 0, icon: 'Briefcase', color: '#f59e0b' }
-      ];
+      // We no longer seed default accounts here. The Onboarding Wizard handles it.
 
       // Seed default categories
       const defaultCategories = [
@@ -114,7 +134,6 @@ app.post(["/api/auth/google", "/auth/google"], async (req, res) => {
         { id: 'cat-5-' + googleId, user_id: googleId, name: 'Entertainment', type: 'expense', icon: 'Play', color: '#8b5cf6' }
       ];
 
-      await supabase.from('accounts').insert(defaultAccounts);
       await supabase.from('categories').insert(defaultCategories);
 
     }
@@ -264,10 +283,47 @@ app.delete(["/api/categories/:id", "/categories/:id"], async (req, res) => {
   res.json({ success: true });
 });
 
+app.get(["/api/budgets", "/budgets"], async (req, res) => {
+  const userId = (req as any).user.id;
+  const { data, error } = await supabase
+    .from('budgets')
+    .select('*, categories(name, icon, color)')
+    .eq('user_id', userId);
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.post(["/api/budgets", "/budgets"], async (req, res) => {
+  const userId = (req as any).user.id;
+  const { id, category_id, amount_limit } = req.body;
+
+  const { error } = await supabase.from('budgets').upsert({
+    id: id || Math.random().toString(36).substr(2, 9),
+    user_id: userId,
+    category_id,
+    amount_limit
+  });
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+app.delete(["/api/budgets/:id", "/budgets/:id"], async (req, res) => {
+  const userId = (req as any).user.id;
+  const budgetId = req.params.id;
+
+  const { error } = await supabase.from('budgets').delete().eq('id', budgetId).eq('user_id', userId);
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
 app.get(["/api/transactions", "/transactions"], async (req, res) => {
   const userId = (req as any).user.id;
+  const { startDate, endDate, categoryId, accountId, search } = req.query;
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('transactions')
     .select(`
       *,
@@ -275,8 +331,26 @@ app.get(["/api/transactions", "/transactions"], async (req, res) => {
       to_account:accounts!to_account_id(name),
       categories(name)
     `)
-    .eq('user_id', userId)
-    .order('date', { ascending: false });
+    .eq('user_id', userId);
+
+  if (startDate) query = query.gte('date', startDate);
+  if (endDate) query = query.lte('date', endDate);
+  
+  if (categoryId && categoryId !== 'all') {
+    query = query.eq('category_id', categoryId);
+  }
+
+  if (accountId && accountId !== 'all') {
+    query = query.or(`from_account_id.eq.${accountId},to_account_id.eq.${accountId}`);
+  }
+
+  if (search) {
+    query = query.ilike('note', `%${search}%`);
+  }
+
+  query = query.order('date', { ascending: false });
+
+  const { data, error } = await query;
 
   if (error) return res.status(500).json({ error: error.message });
 
@@ -292,17 +366,31 @@ app.get(["/api/transactions", "/transactions"], async (req, res) => {
 
 app.post(["/api/transactions", "/transactions"], async (req, res) => {
   const userId = (req as any).user.id;
-  let { id, from_account_id, to_account_id, category_id, amount, type, date, note } = req.body;
+  let { id, from_account_id, to_account_id, category_id, amount, currency, type, date, note } = req.body;
+  const baseCurrency = (req as any).headers['x-base-currency'] || 'USD';
 
   // Fix foreign key constraints: empty strings must be null
   if (!to_account_id) to_account_id = null;
   if (!from_account_id) from_account_id = null;
   if (!category_id) category_id = null;
 
+  // Calculate converted amount for native account balances
+  let convertedAmount = Number(amount);
+  if (currency && currency !== baseCurrency) {
+    const rates = await getExchangeRates();
+    const rateSource = rates[currency] || 1;
+    const rateTarget = rates[baseCurrency] || 1;
+    convertedAmount = (Number(amount) / rateSource) * rateTarget;
+  }
+
   // Use RPC if available, or sequential updates
-  const { data: newTx, error } = await supabase.from('transactions').insert({
-    id, user_id: userId, from_account_id, to_account_id, category_id, amount, type, date, note
-  }).select().single();
+  const insertPayload = {
+    id, user_id: userId, from_account_id, to_account_id, category_id, amount, type, date, note,
+    currency: currency || baseCurrency,
+    amount_base: convertedAmount
+  };
+
+  const { data: newTx, error } = await supabase.from('transactions').insert(insertPayload).select().single();
 
   if (error) {
     console.error("Supabase insert error for transactions:", error);
@@ -313,16 +401,16 @@ app.post(["/api/transactions", "/transactions"], async (req, res) => {
   try {
     if (type === 'income' && to_account_id) {
       let { data } = await supabase.from('accounts').select('balance').eq('id', to_account_id).single();
-      if (data) await supabase.from('accounts').update({ balance: Number(data.balance) + Number(amount) }).eq('id', to_account_id);
+      if (data) await supabase.from('accounts').update({ balance: Number(data.balance) + convertedAmount }).eq('id', to_account_id);
     } else if (type === 'expense' && from_account_id) {
       let { data } = await supabase.from('accounts').select('balance').eq('id', from_account_id).single();
-      if (data) await supabase.from('accounts').update({ balance: Number(data.balance) - Number(amount) }).eq('id', from_account_id);
+      if (data) await supabase.from('accounts').update({ balance: Number(data.balance) - convertedAmount }).eq('id', from_account_id);
     } else if (type === 'transfer' && from_account_id && to_account_id) {
       let { data: fromD } = await supabase.from('accounts').select('balance').eq('id', from_account_id).single();
-      if (fromD) await supabase.from('accounts').update({ balance: Number(fromD.balance) - Number(amount) }).eq('id', from_account_id);
+      if (fromD) await supabase.from('accounts').update({ balance: Number(fromD.balance) - convertedAmount }).eq('id', from_account_id);
 
       let { data: toD } = await supabase.from('accounts').select('balance').eq('id', to_account_id).single();
-      if (toD) await supabase.from('accounts').update({ balance: Number(toD.balance) + Number(amount) }).eq('id', to_account_id);
+      if (toD) await supabase.from('accounts').update({ balance: Number(toD.balance) + convertedAmount }).eq('id', to_account_id);
     }
   } catch (balanceError) {
     console.error("Error updating account balances:", balanceError);
@@ -335,7 +423,8 @@ app.post(["/api/transactions", "/transactions"], async (req, res) => {
 app.put(["/api/transactions/:id", "/transactions/:id"], async (req, res) => {
   const userId = (req as any).user.id;
   const transactionId = req.params.id;
-  let { from_account_id, to_account_id, category_id, amount, type, date, note } = req.body;
+  let { from_account_id, to_account_id, category_id, amount, currency, type, date, note } = req.body;
+  const baseCurrency = (req as any).headers['x-base-currency'] || 'USD';
 
   if (!to_account_id) to_account_id = null;
   if (!from_account_id) from_account_id = null;
@@ -349,28 +438,43 @@ app.put(["/api/transactions/:id", "/transactions/:id"], async (req, res) => {
 
   // Reverse old balance effect
   try {
+    const oldConvertedAmount = Number(old.amount_base || old.amount);
+
     if (old.type === 'income' && old.to_account_id) {
       const { data: acc } = await supabase.from('accounts').select('balance').eq('id', old.to_account_id).single();
-      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - Number(old.amount) }).eq('id', old.to_account_id);
+      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - oldConvertedAmount }).eq('id', old.to_account_id);
     } else if (old.type === 'expense' && old.from_account_id) {
       const { data: acc } = await supabase.from('accounts').select('balance').eq('id', old.from_account_id).single();
-      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + Number(old.amount) }).eq('id', old.from_account_id);
+      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + oldConvertedAmount }).eq('id', old.from_account_id);
     } else if (old.type === 'transfer') {
       if (old.from_account_id) {
         const { data: acc } = await supabase.from('accounts').select('balance').eq('id', old.from_account_id).single();
-        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + Number(old.amount) }).eq('id', old.from_account_id);
+        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + oldConvertedAmount }).eq('id', old.from_account_id);
       }
       if (old.to_account_id) {
         const { data: acc } = await supabase.from('accounts').select('balance').eq('id', old.to_account_id).single();
-        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - Number(old.amount) }).eq('id', old.to_account_id);
+        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - oldConvertedAmount }).eq('id', old.to_account_id);
       }
     }
   } catch (e) { console.error('Error reversing balance', e); }
 
+  // Calculate new converted amount
+  let newConvertedAmount = Number(amount);
+  if (currency && currency !== baseCurrency) {
+    const rates = await getExchangeRates();
+    const rateSource = rates[currency] || 1;
+    const rateTarget = rates[baseCurrency] || 1;
+    newConvertedAmount = (Number(amount) / rateSource) * rateTarget;
+  }
+
   // Update the transaction record
-  const { data: updatedTx, error } = await supabase.from('transactions').update({
-    from_account_id, to_account_id, category_id, amount, type, date, note
-  }).eq('id', transactionId).eq('user_id', userId).select().single();
+  const updatePayload: any = {
+    from_account_id, to_account_id, category_id, amount, type, date, note,
+    currency: currency || baseCurrency,
+    amount_base: newConvertedAmount
+  };
+
+  const { data: updatedTx, error } = await supabase.from('transactions').update(updatePayload).eq('id', transactionId).eq('user_id', userId).select().single();
 
   if (error) return res.status(500).json({ error: error.message });
 
@@ -378,15 +482,19 @@ app.put(["/api/transactions/:id", "/transactions/:id"], async (req, res) => {
   try {
     if (type === 'income' && to_account_id) {
       const { data: acc } = await supabase.from('accounts').select('balance').eq('id', to_account_id).single();
-      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + Number(amount) }).eq('id', to_account_id);
+      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + newConvertedAmount }).eq('id', to_account_id);
     } else if (type === 'expense' && from_account_id) {
       const { data: acc } = await supabase.from('accounts').select('balance').eq('id', from_account_id).single();
-      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - Number(amount) }).eq('id', from_account_id);
-    } else if (type === 'transfer' && from_account_id && to_account_id) {
-      const { data: fromAcc } = await supabase.from('accounts').select('balance').eq('id', from_account_id).single();
-      if (fromAcc) await supabase.from('accounts').update({ balance: Number(fromAcc.balance) - Number(amount) }).eq('id', from_account_id);
-      const { data: toAcc } = await supabase.from('accounts').select('balance').eq('id', to_account_id).single();
-      if (toAcc) await supabase.from('accounts').update({ balance: Number(toAcc.balance) + Number(amount) }).eq('id', to_account_id);
+      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - newConvertedAmount }).eq('id', from_account_id);
+    } else if (type === 'transfer') {
+      if (from_account_id) {
+        const { data: acc } = await supabase.from('accounts').select('balance').eq('id', from_account_id).single();
+        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - newConvertedAmount }).eq('id', from_account_id);
+      }
+      if (to_account_id) {
+        const { data: acc } = await supabase.from('accounts').select('balance').eq('id', to_account_id).single();
+        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + newConvertedAmount }).eq('id', to_account_id);
+      }
     }
   } catch (e) { console.error('Error applying new balance', e); }
 
@@ -405,20 +513,21 @@ app.delete(["/api/transactions/:id", "/transactions/:id"], async (req, res) => {
 
   // Reverse old balance effect
   try {
+    const oldConvertedAmount = Number(old.amount_base || old.amount);
     if (old.type === 'income' && old.to_account_id) {
       const { data: acc } = await supabase.from('accounts').select('balance').eq('id', old.to_account_id).single();
-      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - Number(old.amount) }).eq('id', old.to_account_id);
+      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - oldConvertedAmount }).eq('id', old.to_account_id);
     } else if (old.type === 'expense' && old.from_account_id) {
       const { data: acc } = await supabase.from('accounts').select('balance').eq('id', old.from_account_id).single();
-      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + Number(old.amount) }).eq('id', old.from_account_id);
+      if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + oldConvertedAmount }).eq('id', old.from_account_id);
     } else if (old.type === 'transfer') {
       if (old.from_account_id) {
         const { data: acc } = await supabase.from('accounts').select('balance').eq('id', old.from_account_id).single();
-        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + Number(old.amount) }).eq('id', old.from_account_id);
+        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) + oldConvertedAmount }).eq('id', old.from_account_id);
       }
       if (old.to_account_id) {
         const { data: acc } = await supabase.from('accounts').select('balance').eq('id', old.to_account_id).single();
-        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - Number(old.amount) }).eq('id', old.to_account_id);
+        if (acc) await supabase.from('accounts').update({ balance: Number(acc.balance) - oldConvertedAmount }).eq('id', old.to_account_id);
       }
     }
   } catch (e) {
@@ -578,11 +687,38 @@ app.get(["/api/dashboard", "/dashboard"], async (req, res) => {
     .eq('user_id', userId)
     .like('date', `${month}%`);
 
+  const rates = await getExchangeRates();
+  const baseCurrency = (req as any).headers['x-base-currency'] || 'USD';
+  const targetRate = rates[baseCurrency] || 1;
+
+  const convert = (amount: number, fromCurrency: string) => {
+    if (!fromCurrency || fromCurrency === baseCurrency) return amount;
+    const sourceRate = rates[fromCurrency] || 1;
+    return (amount / sourceRate) * targetRate;
+  };
+
   const totalNetWorth = (accounts || []).reduce((acc: number, curr: any) => acc + Number(curr.balance), 0);
-  const monthlyIncome = (transactions || []).filter((t: any) => t.type === 'income').reduce((acc: number, curr: any) => acc + Number(curr.amount), 0);
-  const monthlyExpense = (transactions || []).filter((t: any) => t.type === 'expense').reduce((acc: number, curr: any) => acc + Number(curr.amount), 0);
+  const monthlyIncome = (transactions || []).filter((t: any) => t.type === 'income').reduce((acc: number, curr: any) => acc + convert(Number(curr.amount), curr.currency), 0);
+  const monthlyExpense = (transactions || []).filter((t: any) => t.type === 'expense').reduce((acc: number, curr: any) => acc + convert(Number(curr.amount), curr.currency), 0);
   const monthlySavings = monthlyIncome - monthlyExpense;
   const savingsRate = monthlyIncome > 0 ? (monthlySavings / monthlyIncome) * 100 : 0;
+
+  // Fetch budgets and calculate spending
+  const { data: budgets } = await supabase
+    .from('budgets')
+    .select('*, categories(name, icon, color)')
+    .eq('user_id', userId);
+
+  const budgetProgress = (budgets || []).map(b => {
+    const spent = (transactions || [])
+      .filter((t: any) => t.type === 'expense' && t.category_id === b.category_id)
+      .reduce((s: number, t: any) => s + convert(Number(t.amount), t.currency), 0);
+    return {
+      ...b,
+      spent,
+      limit: Number(b.amount_limit)
+    };
+  });
 
   res.json({
     totalNetWorth,
@@ -590,7 +726,8 @@ app.get(["/api/dashboard", "/dashboard"], async (req, res) => {
     monthlyExpense,
     monthlySavings,
     savingsRate,
-    accounts: accounts || []
+    accounts: accounts || [],
+    budgets: budgetProgress
   });
 });
 
@@ -603,17 +740,28 @@ app.get(["/api/dashboard/history", "/dashboard/history"], async (req, res) => {
 
   const { data: allTx } = await supabase
     .from('transactions')
-    .select('amount,type,date')
+    .select('amount,type,date,currency')
     .eq('user_id', userId)
     .order('date', { ascending: false });
+
+  const rates = await getExchangeRates();
+  const baseCurrency = (req as any).headers['x-base-currency'] || 'USD';
+  const targetRate = rates[baseCurrency] || 1;
+
+  const convert = (amount: number, fromCurrency: string) => {
+    if (!fromCurrency || fromCurrency === baseCurrency) return amount;
+    const sourceRate = rates[fromCurrency] || 1;
+    return (amount / sourceRate) * targetRate;
+  };
 
   // Build map of monthly aggregates
   const monthMap: Record<string, { income: number; expense: number }> = {};
   for (const t of (allTx || [])) {
     const key = t.date.slice(0, 7); // YYYY-MM
     if (!monthMap[key]) monthMap[key] = { income: 0, expense: 0 };
-    if (t.type === 'income') monthMap[key].income += Number(t.amount);
-    if (t.type === 'expense') monthMap[key].expense += Number(t.amount);
+    const convertedAmount = convert(Number(t.amount), t.currency);
+    if (t.type === 'income') monthMap[key].income += convertedAmount;
+    if (t.type === 'expense') monthMap[key].expense += convertedAmount;
   }
 
   // Walk backwards from current net worth to reconstruct historical net worth
@@ -668,5 +816,38 @@ app.post(["/api/maintenance/sync-balances", "/maintenance/sync-balances"], async
     res.status(500).json({ error: e.message });
   }
 });
+
+app.delete(["/api/user/delete", "/user/delete"], asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.id;
+
+  // Delete all user data securely
+  // Using Promise.all for parallel deletion of child records to avoid orphaned data
+  try {
+    await Promise.all([
+      supabase.from('transactions').delete().eq('user_id', userId),
+      supabase.from('user_settings').delete().eq('user_id', userId),
+      supabase.from('budgets').delete().eq('user_id', userId) // Even if table doesn't exist yet, it's safe to include
+    ]);
+
+    // Categories and Accounts might be referenced by other things, but we deleted transactions first
+    await Promise.all([
+      supabase.from('accounts').delete().eq('user_id', userId),
+      supabase.from('categories').delete().eq('user_id', userId),
+    ]);
+
+    // Finally delete the user
+    const { error } = await supabase.from('users').delete().eq('id', userId);
+
+    if (error) {
+      console.error("Error deleting user:", error);
+      return res.status(500).json({ error: "Failed to delete account from database." });
+    }
+
+    res.json({ success: true, message: "Account deleted successfully." });
+  } catch (err: any) {
+    console.error("Unexpected error during account deletion:", err);
+    res.status(500).json({ error: "Internal server error during deletion." });
+  }
+}));
 
 export default app;

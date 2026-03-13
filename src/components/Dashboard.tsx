@@ -11,7 +11,8 @@ import {
   CreditCard,
   Briefcase,
   X,
-  ChevronRight
+  ChevronRight,
+  Target
 } from 'lucide-react';
 import {
   AreaChart,
@@ -347,6 +348,73 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
           <h3 className="text-lg lg:text-xl font-bold text-white mb-6">Smart Insights</h3>
           <InsightCards insights={smartInsights} maxShow={3} />
         </div>
+      </div>
+
+      <div className="bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h3 className="text-lg lg:text-xl font-bold text-white">Budget Tracking</h3>
+            <p className="text-zinc-500 text-xs mt-1">Monitor your monthly spending across categories.</p>
+          </div>
+          <button 
+            onClick={() => setActiveTab('budgets')}
+            className="text-emerald-400 text-xs font-bold uppercase tracking-wider hover:text-emerald-300 transition-colors"
+          >
+            Manage Budgets
+          </button>
+        </div>
+
+        {data.budgets && data.budgets.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {data.budgets.map((budget: any) => {
+              const percent = Math.min((budget.spent / budget.limit) * 100, 100);
+              const isOver = budget.spent > budget.limit;
+              const cat = budget.categories || { name: 'Uncategorized', icon: 'Tag', color: '#71717a' };
+
+              return (
+                <div key={budget.id} className="bg-white/5 rounded-2xl p-5 border border-white/5">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center" style={{ color: cat.color }}>
+                        <Target className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-white font-bold text-sm">{cat.name}</p>
+                        <p className="text-zinc-500 text-[10px] uppercase tracking-widest">{isOver ? 'Over Budget' : 'On Track'}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-white font-bold text-sm">{formatCurrency(budget.spent)}</p>
+                      <p className="text-zinc-500 text-[10px]">of {formatCurrency(budget.limit)}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${percent}%` }}
+                      className={cn(
+                        "h-full rounded-full",
+                        isOver ? "bg-red-500" : percent > 80 ? "bg-amber-500" : "bg-emerald-500"
+                      )}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-12 border border-dashed border-white/10 rounded-[24px] text-zinc-500">
+            <Target className="w-12 h-12 mb-4 opacity-20" />
+            <p className="text-sm font-medium mb-4">No budgets set for this month.</p>
+            <button 
+              onClick={() => setActiveTab('budgets')}
+              className="px-6 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-all border border-white/5"
+            >
+              Set Your First Budget
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Health Score + Forecast */}

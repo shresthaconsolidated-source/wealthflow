@@ -7,7 +7,8 @@ import {
   LogOut,
   Wallet,
   Heart,
-  MessageCircle
+  MessageCircle,
+  Target
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -23,6 +24,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight },
+    { id: 'budgets', label: 'Budgets', icon: Target },
     { id: 'analysis', label: 'Analysis', icon: TrendingUp },
     { id: 'donations', label: 'Donations', icon: Heart },
     { id: 'settings', label: 'Settings', icon: Settings },

@@ -59,7 +59,8 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
     note: '',
     category_id: '',
     from_account_id: '',
-    to_account_id: ''
+    to_account_id: '',
+    currency: (typeof window !== 'undefined' ? localStorage.getItem('base_currency') : 'USD') || 'USD'
   });
   const [accounts, setAccounts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -99,71 +100,75 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
 
   const { fetchWithAuth } = useApi();
 
-  const fetchTransactions = () => {
-    fetchWithAuth('/api/transactions')
+  const fetchTransactions = React.useCallback(() => {
+    const params = new URLSearchParams();
+    if (searchQuery) params.append('search', searchQuery);
+    
+    let appliedDateStart = dateStart;
+    let appliedDateEnd = dateEnd;
+    
+    if (filterCurrentMonth && !dateStart && !dateEnd) {
+      const now = new Date();
+      // Start of current month
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      // End of current month
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      
+      // Convert to ISO string for backend
+      // Using UTC offset adjustment so the local date matches the ISO date
+      const adjustTimezone = (d: Date) => {
+        const offset = d.getTimezoneOffset() * 60000;
+        return new Date(d.getTime() - offset).toISOString();
+      };
+      
+      appliedDateStart = adjustTimezone(start);
+      appliedDateEnd = adjustTimezone(end);
+    } else {
+      if (dateStart) {
+        appliedDateStart = new Date(dateStart).toISOString();
+      }
+      if (dateEnd) {
+        // Include the entire end day
+        const eDate = new Date(dateEnd);
+        eDate.setHours(23, 59, 59, 999);
+        appliedDateEnd = eDate.toISOString();
+      }
+    }
+    
+    if (appliedDateStart) params.append('startDate', appliedDateStart);
+    if (appliedDateEnd) params.append('endDate', appliedDateEnd);
+    if (filterCategoryId !== 'all') params.append('categoryId', filterCategoryId);
+    if (filterAccountId !== 'all') params.append('accountId', filterAccountId);
+    
+    fetchWithAuth(`/api/transactions?${params.toString()}`)
       .then(res => res.json())
-      .then(setTransactions)
+      .then(data => {
+        // Filter type locally since modifying the API further isn't strictly necessary
+        if (filterType !== 'all') {
+            setTransactions(data.filter((t: any) => t.type === filterType));
+        } else {
+            setTransactions(data);
+        }
+      })
       .catch(console.error);
-  };
+  }, [fetchWithAuth, searchQuery, filterType, filterCategoryId, filterAccountId, dateStart, dateEnd, filterCurrentMonth]);
 
+  // Debounce the fetch and apply filters when dependencies change
   useEffect(() => {
-    fetchTransactions();
+    const timer = setTimeout(() => {
+      fetchTransactions();
+    }, 300); // 300ms debounce
+    return () => clearTimeout(timer);
+  }, [fetchTransactions]);
+
+  // Initial load for accounts & categories
+  useEffect(() => {
     fetchWithAuth('/api/accounts').then(res => res.json()).then(setAccounts).catch(console.error);
     fetchWithAuth('/api/categories').then(res => res.json()).then(setCategories).catch(console.error);
   }, [fetchWithAuth]);
 
-  // Compute filtered transactions
-  const filteredTransactions = React.useMemo(() => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-
-    return transactions.filter(t => {
-      // 1. Search Query
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const matchesNote = t.note?.toLowerCase().includes(query);
-        const matchesCategory = t.category_name?.toLowerCase().includes(query);
-        const matchesAccount = t.from_account_name?.toLowerCase().includes(query) || t.to_account_name?.toLowerCase().includes(query);
-        const matchesAmount = t.amount?.toString().includes(query);
-        if (!matchesNote && !matchesCategory && !matchesAccount && !matchesAmount) return false;
-      }
-
-      // 2. Type Filter
-      if (filterType !== 'all' && t.type !== filterType) return false;
-
-      // 3. Category Filter
-      if (filterCategoryId !== 'all' && t.category_id !== filterCategoryId) return false;
-
-      // 4. Account Filter
-      if (filterAccountId !== 'all') {
-        if (t.from_account_id !== filterAccountId && t.to_account_id !== filterAccountId) return false;
-      }
-
-      // 5. Current Month Filter
-      if (filterCurrentMonth && !dateStart && !dateEnd) {
-        const tDate = new Date(t.date);
-        if (tDate.getFullYear() !== currentYear || tDate.getMonth() !== currentMonth) {
-          return false;
-        }
-      }
-
-      // 6. Date Range Filter
-      if (dateStart) {
-        const tDate = new Date(t.date).getTime();
-        const sDate = new Date(dateStart).getTime();
-        if (tDate < sDate) return false;
-      }
-      if (dateEnd) {
-        // Add 1 day to end date to make it inclusive of the end day
-        const tDate = new Date(t.date).getTime();
-        const eDate = new Date(dateEnd).getTime() + 86400000;
-        if (tDate >= eDate) return false;
-      }
-
-      return true;
-    });
-  }, [transactions, searchQuery, filterType, filterCategoryId, filterAccountId, dateStart, dateEnd, filterCurrentMonth]);
+  // 'transactions' state is now already filtered by the server and our callback.
+  const filteredTransactions = transactions;
 
   // Bulk selection handlers
   const handleToggleSelect = (id: string) => {
@@ -237,7 +242,8 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
           note: '',
           category_id: '',
           from_account_id: '',
-          to_account_id: ''
+          to_account_id: '',
+          currency: localStorage.getItem('base_currency') || 'USD'
         });
       }
     } catch (error) {
@@ -282,7 +288,8 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
         note: data.note || '',
         category_id: data.category_id || '',
         from_account_id: data.from_account_id || '',
-        to_account_id: data.to_account_id || ''
+        to_account_id: data.to_account_id || '',
+        currency: data.currency || localStorage.getItem('base_currency') || 'USD'
       });
     } else {
       setFormData({
@@ -291,7 +298,8 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
         note: '',
         category_id: '',
         from_account_id: '',
-        to_account_id: ''
+        to_account_id: '',
+        currency: localStorage.getItem('base_currency') || 'USD'
       });
     }
     setShowAddModal(true);
@@ -308,6 +316,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
       category_id: t.category_id || '',
       from_account_id: t.from_account_id || '',
       to_account_id: t.to_account_id || '',
+      currency: t.currency || localStorage.getItem('base_currency') || 'USD',
     });
     setOpenMenuId(null);
     setShowAddModal(true);
@@ -893,6 +902,21 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                       className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm"
                     />
                   </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-1">Currency</label>
+                  <select
+                    value={formData.currency}
+                    onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                    className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm appearance-none cursor-pointer [&>option]:bg-[#151518]"
+                  >
+                    <option value="USD">USD ($) - US Dollar</option>
+                    <option value="EUR">EUR (€) - Euro</option>
+                    <option value="GBP">GBP (£) - British Pound</option>
+                    <option value="INR">INR (₹) - Indian Rupee</option>
+                    <option value="NPR">NPR (रू) - Nepalese Rupee</option>
+                  </select>
                 </div>
 
                 <div className="space-y-3">

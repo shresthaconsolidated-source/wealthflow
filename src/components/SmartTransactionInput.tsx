@@ -36,6 +36,7 @@ export default function SmartTransactionInput({ accounts, categories, transactio
   const [quickAccount, setQuickAccount] = useState('');
   const [quickNote, setQuickNote] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState((typeof window !== 'undefined' ? localStorage.getItem('base_currency') : 'USD') || 'USD');
 
   // Clarification state — holds fields that need user input before saving
   const [clarifyData, setClarifyData] = useState<{
@@ -174,6 +175,7 @@ export default function SmartTransactionInput({ accounts, categories, transactio
     await doSave({
       type: parsed.type, amount: parsed.amount, note: parsed.note, date: parsed.date,
       from_account_id: fromAcc?.id || '', to_account_id: toAcc?.id || '', category_id: cat?.id || '',
+      currency: selectedCurrency
     });
   };
 
@@ -220,6 +222,7 @@ export default function SmartTransactionInput({ accounts, categories, transactio
       category_id: newData.resolvedCategoryId,
       from_account_id: newData.resolvedFromId,
       to_account_id: newData.resolvedToId,
+      currency: selectedCurrency
     });
   };
 
@@ -233,6 +236,7 @@ export default function SmartTransactionInput({ accounts, categories, transactio
       from_account_id: resolveAccount(parsed.from_account_name)?.id || '',
       to_account_id: resolveAccount(parsed.to_account_name)?.id || '',
       category_id: resolveCategory(parsed.category_keyword, parsed.type)?.id || '',
+      currency: selectedCurrency
     });
     setInput('');
     setParsed(null);
@@ -254,6 +258,7 @@ export default function SmartTransactionInput({ accounts, categories, transactio
         from_account_id: quickAction.type === 'income' ? '' : acc?.id || '',
         to_account_id: quickAction.type === 'income' ? acc?.id || '' : '',
         category_id: cat?.id || '',
+        currency: selectedCurrency
       });
       setQuickAction(null);
       setQuickAmount('');
@@ -268,6 +273,19 @@ export default function SmartTransactionInput({ accounts, categories, transactio
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-1 justify-end">
+         <select
+           value={selectedCurrency}
+           onChange={e => setSelectedCurrency(e.target.value)}
+           className="bg-black/30 text-emerald-400 text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-xl border border-white/5 focus:outline-none focus:border-emerald-500/30 cursor-pointer"
+         >
+            <option value="USD">USD ($)</option>
+            <option value="EUR">EUR (€)</option>
+            <option value="GBP">GBP (£)</option>
+            <option value="INR">INR (₹)</option>
+            <option value="NPR">NPR (रू)</option>
+         </select>
+      </div>
       {/* --- Text Input Bar --- */}
       <div className="relative">
         <div className="flex items-center gap-3 bg-white/[0.03] border border-white/8 rounded-2xl px-4 py-3 focus-within:border-emerald-500/40 focus-within:ring-2 focus-within:ring-emerald-500/10 transition-all">

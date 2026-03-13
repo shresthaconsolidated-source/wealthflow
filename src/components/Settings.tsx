@@ -13,9 +13,11 @@ import {
   TrendingDown,
   ShieldAlert,
   Download,
-  CheckCircle2
+  CheckCircle2,
+  AlertOctagon
 } from 'lucide-react';
 import { formatCurrency, cn, getCurrencySymbol } from '@/src/lib/utils';
+import { useAuth } from '@/src/contexts/AuthContext';
 import { useApi } from '@/src/hooks/useApi';
 
 export default function Settings() {
@@ -29,6 +31,9 @@ export default function Settings() {
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [itemToDelete, setItemToDelete] = useState<{ id: string, type: 'accounts' | 'categories', name: string } | null>(null);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const { logout } = useAuth();
 
   const [activeAccountTab, setActiveAccountTab] = useState<'bank' | 'cash' | 'asset'>('bank');
   const [activeCategoryTab, setActiveCategoryTab] = useState<'income' | 'expense'>('income');
@@ -108,6 +113,26 @@ export default function Settings() {
         msg = `Cannot delete: this ${type === 'accounts' ? 'account' : 'category'} is currently used in your transactions. Please delete or re-assign those transactions first.`;
       }
       showError(msg);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    try {
+      const res = await fetchWithAuth('/api/user/delete', { method: 'DELETE' });
+      if (res.ok) {
+        logout();
+      } else {
+        const data = await res.json();
+        showError(data.error || 'Failed to delete account.');
+        setIsDeletingAccount(false);
+        setShowDeleteAccountModal(false);
+      }
+    } catch (error) {
+      console.error('Account deletion error:', error);
+      showError('Network error while deleting account.');
+      setIsDeletingAccount(false);
+      setShowDeleteAccountModal(false);
     }
   };
 
@@ -428,6 +453,26 @@ export default function Settings() {
           </div>
         </div>
 
+        <div className="pt-12 border-t border-red-500/10 relative z-10">
+          <h3 className="text-xl lg:text-2xl font-bold text-red-500 mb-8 flex items-center gap-3">
+            <AlertOctagon className="w-6 h-6" /> Danger Zone
+          </h3>
+          <div className="p-8 rounded-3xl bg-red-500/5 border border-red-500/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div>
+              <p className="text-white font-bold text-base">Delete Account & Data</p>
+              <p className="text-zinc-500 text-sm mt-2 max-w-xl">
+                Permanently remove your account, settings, and all transaction data. This action is irreversible.
+              </p>
+            </div>
+            <button 
+              onClick={() => setShowDeleteAccountModal(true)}
+              className="px-8 py-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold uppercase tracking-widest hover:bg-red-500/20 hover:text-red-400 transition-colors whitespace-nowrap"
+            >
+              Delete Account
+            </button>
+          </div>
+        </div>
+
       </div>
 
       {showAddModal && (
@@ -540,6 +585,44 @@ export default function Settings() {
           <div className="bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-xl px-6 py-4 rounded-2xl flex items-center gap-4 shadow-2xl shadow-emerald-500/10">
             <CheckCircle2 className="w-5 h-5 text-emerald-400" />
             <p className="text-emerald-400 font-bold text-sm">{successToast}</p>
+          </div>
+        </div>
+      )}
+
+      {showDeleteAccountModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xl animate-in fade-in duration-200">
+          <div className="bg-[#0A0A0B] rounded-[32px] border border-white/10 p-8 w-full max-w-md relative shadow-2xl shadow-black text-center">
+            <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-orange-500/5 rounded-[32px] pointer-events-none" />
+            <div className="mx-auto w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-6 relative z-10">
+              <AlertOctagon className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2 relative z-10">Delete Account?</h2>
+            <p className="text-zinc-400 mb-8 relative z-10">
+              Are you absolutely sure? This will permanently delete your <span className="text-white font-bold">entire account</span>, including all transactions, accounts, and settings. 
+              <br/><br/>
+              <span className="text-red-400 font-bold">This action cannot be undone.</span>
+            </p>
+            <div className="flex gap-4 relative z-10">
+              <button
+                onClick={() => setShowDeleteAccountModal(false)}
+                disabled={isDeletingAccount}
+                className="flex-1 py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={isDeletingAccount}
+                className="flex-1 py-4 rounded-2xl bg-gradient-to-r from-red-500 to-red-700 hover:from-red-400 hover:to-red-600 text-white font-bold shadow-[0_0_30px_rgba(239,68,68,0.2)] hover:shadow-[0_0_50px_rgba(239,68,68,0.3)] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isDeletingAccount ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    Deleting...
+                  </>
+                ) : 'Yes, Delete Everything'}
+              </button>
+            </div>
           </div>
         </div>
       )}
