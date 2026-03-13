@@ -294,7 +294,6 @@ export default function Budgets() {
               <div>
                 <label className="block text-zinc-400 text-xs font-bold uppercase tracking-widest mb-3">Expense Category</label>
                 <select
-                  required
                   value={formData.category_id}
                   onChange={e => setFormData({ ...formData, category_id: e.target.value })}
                   className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-emerald-500/50 transition-colors appearance-none"
@@ -319,7 +318,7 @@ export default function Budgets() {
                     required
                     value={formData.amount_limit}
                     onChange={e => setFormData({ ...formData, amount_limit: e.target.value })}
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl pl-10 pr-5 py-4 text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl pl-20 pr-5 py-4 text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
                     placeholder="e.g. 500.00"
                   />
                 </div>
