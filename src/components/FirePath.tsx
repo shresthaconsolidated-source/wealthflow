@@ -27,7 +27,7 @@ export default function FirePath({ history, accounts }: Props) {
   const [years, setYears] = useState(20); // Default 20 years
   const [manualInvestment, setManualInvestment] = useState<number | null>(null);
   const [manualReturn, setManualReturn] = useState<number | null>(null);
-  const [useHistorical, setUseHistorical] = useState(true);
+  const [plannedExpenses, setPlannedExpenses] = useState<number | null>(null);
 
   // Derived from history
   const currentNetWorth = accounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
@@ -35,11 +35,16 @@ export default function FirePath({ history, accounts }: Props) {
     ? history.reduce((sum, h) => sum + (h.savings || 0), 0) / history.length
     : 0;
   
+  const avgExpenses = history.length > 0
+    ? history.reduce((sum, h) => sum + (h.expense || 0), 0) / history.length
+    : 30000; // Default fallback
+
   // Roughly estimate historical return if we had data, for now we default to a safe 12% for stock/mutual funds
   const historicalReturn = 12.0; 
 
   const effectiveInvestment = manualInvestment !== null ? manualInvestment : avgMonthlySavings;
   const effectiveReturn = manualReturn !== null ? manualReturn : historicalReturn;
+  const effectiveExpenses = plannedExpenses !== null ? plannedExpenses : avgExpenses;
 
   useEffect(() => {
     fetchWithAuth('/api/user/settings')
@@ -49,6 +54,7 @@ export default function FirePath({ history, accounts }: Props) {
         if (settings.fire_years !== undefined) setYears(Number(settings.fire_years));
         if (settings.fire_manual_investment !== undefined) setManualInvestment(settings.fire_manual_investment);
         if (settings.fire_manual_return !== undefined) setManualReturn(settings.fire_manual_return);
+        if (settings.fire_planned_expenses !== undefined) setPlannedExpenses(settings.fire_planned_expenses);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -62,6 +68,7 @@ export default function FirePath({ history, accounts }: Props) {
         fire_years: updates.years ?? years,
         fire_manual_investment: updates.manualInvestment ?? manualInvestment,
         fire_manual_return: updates.manualReturn ?? manualReturn,
+        fire_planned_expenses: updates.plannedExpenses ?? plannedExpenses,
       })
     });
   };
@@ -84,31 +91,22 @@ export default function FirePath({ history, accounts }: Props) {
   const monthlyPassiveReal = monthlyPassiveIncome / Math.pow(1 + inflationRate, months);
 
   // Safe Withdrawal Rate (SWR) logic
-  // If we want it to last "forever", we withdraw (Return - Inflation)
   const safeWithdrawalPct = Math.max(0, effectiveReturn - inflation);
   const safeAnnualWithdrawal = futureValueNominal * (safeWithdrawalPct / 100);
   const safeMonthlyWithdrawalToday = (safeAnnualWithdrawal / 12) / Math.pow(1 + inflationRate, months);
 
-  // When can I retire? (Targets current expenses)
-  const avgExpenses = history.length > 0
-    ? history.reduce((sum, h) => sum + (h.expense || 0), 0) / history.length
-    : 30000; // Default fallback
-
-  const targetNetWorthReal = (avgExpenses * 12) / (safeWithdrawalPct / 100);
+  const targetNetWorthReal = (effectiveExpenses * 12) / (safeWithdrawalPct / 100);
   
-  // Estimate years to target (Approximate)
+  // Estimate years to target
   let yearsToRetire = 0;
   if (pmt > 0 || effectiveReturn > inflation) {
     let current = currentNetWorth;
-    const target = targetNetWorthReal; // Simplification: tracking real terms
+    const target = targetNetWorthReal;
     const realMonthlyRate = (effectiveReturn - inflation) / 100 / 12;
     
     if (current >= target) {
         yearsToRetire = 0;
     } else {
-        // Solving for months in FV formula is logarithmic
-        // target = current * (1+r)^m + pmt * ((1+r)^m - 1)/r
-        // For simplicity, we loop until we hit it or 100 years
         let m = 0;
         while (current < target && m < 1200) {
             current = current * (1 + realMonthlyRate) + pmt;
@@ -167,6 +165,37 @@ export default function FirePath({ history, accounts }: Props) {
 
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex justify-between">
+                Planned Monthly Exp.
+                <button 
+                  onClick={() => {
+                    const val = plannedExpenses === null ? Math.round(avgExpenses) : null;
+                    setPlannedExpenses(val);
+                    saveSettings({ plannedExpenses: val });
+                  }}
+                  className="text-emerald-400 hover:underline"
+                >
+                    {plannedExpenses === null ? 'Override' : 'Use History'}
+                </button>
+              </label>
+              <div className="relative group">
+                <input 
+                  type="number"
+                  value={plannedExpenses !== null ? plannedExpenses : Math.round(avgExpenses)}
+                  disabled={plannedExpenses === null}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setPlannedExpenses(val);
+                    saveSettings({ plannedExpenses: val });
+                  }}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all disabled:opacity-50"
+                  placeholder="0"
+                />
+                <span className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">{getCurrencySymbol()}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex justify-between">
                 Expected Return (Ann.)
                 <button 
                   onClick={() => {
@@ -215,7 +244,7 @@ export default function FirePath({ history, accounts }: Props) {
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 sm:col-span-2">
               <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Time Horizon</label>
               <select 
                 value={years}
@@ -224,7 +253,7 @@ export default function FirePath({ history, accounts }: Props) {
                   setYears(val);
                   saveSettings({ years: val });
                 }}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all appearance-none"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all appearance-none text-center"
               >
                 <option value={5}>5 Years</option>
                 <option value={10}>10 Years</option>
@@ -253,18 +282,19 @@ export default function FirePath({ history, accounts }: Props) {
               {yearsToRetire <= 0 ? "You can retire today!" : `Retire in ${yearsToRetire.toFixed(1)} years`}
             </h3>
             <p className="text-emerald-200/60 text-sm">
-                Based on your current {formatCurrency(currentNetWorth)} wealth and an average monthly spend of {formatCurrency(avgExpenses)}.
+                Based on your current {formatCurrency(currentNetWorth)} wealth and target expenses of {formatCurrency(effectiveExpenses)}.
             </p>
           </div>
           
           <div className="pt-8 border-t border-emerald-500/20 mt-8 relative z-10">
             <div className="flex justify-between items-center">
-              <span className="text-emerald-300/80 text-xs font-bold uppercase tracking-widest">Monthly Goal</span>
-              <span className="text-white font-bold">{formatCurrency(pmt)}/mo</span>
+              <span className="text-emerald-300/80 text-xs font-bold uppercase tracking-widest">Monthly Investment</span>
+              <span className="text-white font-bold text-xl">{formatCurrency(pmt)}/mo</span>
             </div>
           </div>
         </div>
       </div>
+
 
       {/* Projection Results */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
