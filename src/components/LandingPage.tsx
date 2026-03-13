@@ -34,7 +34,7 @@ export default function LandingPage({ onLoginSuccess }: Props) {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
               <Wallet className="text-white w-6 h-6" />
             </div>
-            <span className="text-xl font-black tracking-tighter uppercase">WealthFlow</span>
+            <span className="text-xl font-black tracking-tighter uppercase text-white">WealthFlow</span>
           </div>
           
           <div className="flex items-center gap-8">
@@ -42,70 +42,79 @@ export default function LandingPage({ onLoginSuccess }: Props) {
               <a href="#features" className="text-sm font-bold text-zinc-400 hover:text-white transition-colors">Features</a>
               <a href="#security" className="text-sm font-bold text-zinc-400 hover:text-white transition-colors">Security</a>
             </div>
-            <div className="scale-90 origin-right">
-              <GoogleLogin
-                onSuccess={(res) => res.credential && onLoginSuccess(res.credential)}
-                onError={() => console.log('Login Failed')}
-                theme="filled_black"
-                shape="pill"
-                text="signin_with"
-              />
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full blur opacity-30 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
+              <div className="relative flex items-center bg-[#0A0A0B] rounded-full scale-90 sm:scale-100">
+                <GoogleLogin
+                  onSuccess={(res) => res.credential && onLoginSuccess(res.credential)}
+                  onError={() => console.log('Login Failed')}
+                  theme="filled_black"
+                  shape="pill"
+                  text="signin_with"
+                />
+              </div>
             </div>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="relative z-10 pt-20 pb-32">
+      <section className="relative z-10 pt-16 md:pt-24 pb-32">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-            <div className="space-y-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 md:gap-24 items-center">
+            <div className="space-y-8 md:space-y-12">
               <motion.div 
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full"
               >
                 <Zap className="w-4 h-4 text-emerald-400" />
-                <span className="text-xs font-black text-emerald-400 uppercase tracking-widest">Version 2.0 is Live</span>
+                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Version 2.0 is Live</span>
               </motion.div>
               
-              <motion.h1 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="text-6xl md:text-8xl font-black tracking-tight leading-[0.9] text-white"
-              >
-                MASTER YOUR <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-blue-500">FREEDOM.</span>
-              </motion.h1>
-              
-              <motion.p 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="text-xl text-zinc-500 max-w-lg leading-relaxed font-medium"
-              >
-                A high-precision private wealth simulator designed for those who value privacy, intelligence, and beautiful design.
-              </motion.p>
+              <div className="space-y-6">
+                <motion.h1 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="text-6xl md:text-[5rem] lg:text-[6rem] font-black tracking-tighter leading-[0.9] text-white"
+                >
+                  MASTER YOUR <br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-emerald-500 to-blue-600">FREEDOM.</span>
+                </motion.h1 >
+                
+                <motion.p 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="text-lg md:text-xl text-zinc-500 max-w-lg leading-relaxed font-medium"
+                >
+                  A high-precision private wealth simulator designed for those who value privacy, intelligence, and beautiful design.
+                </motion.p>
+              </div>
               
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="flex flex-wrap gap-4 pt-4"
+                className="flex flex-col sm:flex-row items-center gap-6 pt-4"
               >
-                <div className="scale-110">
-                  <GoogleLogin
-                    onSuccess={(res) => res.credential && onLoginSuccess(res.credential)}
-                    onError={() => console.log('Login Failed')}
-                    theme="filled_black"
-                    shape="pill"
-                    text="continue_with"
-                  />
+                <div className="relative group">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-blue-600 rounded-full blur-md opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200"></div>
+                  <div className="relative scale-110">
+                    <GoogleLogin
+                      onSuccess={(res) => res.credential && onLoginSuccess(res.credential)}
+                      onError={() => console.log('Login Failed')}
+                      theme="filled_black"
+                      shape="pill"
+                      text="continue_with"
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 px-6 py-3 text-zinc-500 text-sm font-bold uppercase tracking-widest">
+                
+                <div className="flex items-center gap-2 px-6 py-3 text-zinc-500 text-[10px] font-black uppercase tracking-widest border border-white/5 rounded-full bg-white/[0.02]">
                   <Shield className="w-4 h-4 text-emerald-500" />
-                  No Subscription Required
+                  Enterprise Grade Privacy
                 </div>
               </motion.div>
 
@@ -113,61 +122,44 @@ export default function LandingPage({ onLoginSuccess }: Props) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
-                className="flex items-center gap-8 pt-10"
+                className="flex items-center gap-8 md:gap-12 pt-10"
               >
                 <div className="space-y-1">
-                  <p className="text-2xl font-black text-white">$0.00</p>
-                  <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Setup Costs</p>
+                  <p className="text-3xl font-black text-white">$0.00</p>
+                  <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Setup Costs</p>
                 </div>
-                <div className="w-px h-10 bg-white/5"></div>
+                <div className="w-px h-10 bg-white/10"></div>
                 <div className="space-y-1">
-                  <p className="text-2xl font-black text-white">100%</p>
-                  <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Data Privacy</p>
+                  <p className="text-3xl font-black text-white">100%</p>
+                  <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Data Privacy</p>
                 </div>
-                <div className="w-px h-10 bg-white/5"></div>
+                <div className="w-px h-10 bg-white/10"></div>
                 <div className="space-y-1">
-                  <p className="text-2xl font-black text-white">24/7</p>
-                  <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Real-time Insights</p>
+                  <p className="text-3xl font-black text-white">Secured</p>
+                  <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">By Google</p>
                 </div>
               </motion.div>
             </div>
 
             <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2, duration: 0.8 }}
-              className="relative group"
+              initial={{ opacity: 0, scale: 0.9, rotate: 5 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              transition={{ delay: 0.2, duration: 1, ease: "easeOut" }}
+              className="relative"
             >
-              {/* Glass Mockup Simulation */}
-              <div className="relative bg-[#151518] border border-white/10 rounded-[40px] p-2 shadow-2xl shadow-emerald-500/10 transform rotate-2 hover:rotate-0 transition-all duration-700">
-                <div className="bg-[#0A0A0B] rounded-[36px] overflow-hidden border border-white/5 aspect-[4/3] relative">
-                  {/* Fake UI Elements */}
-                  <div className="p-8 space-y-6">
-                    <div className="flex justify-between items-center">
-                      <div className="h-8 w-32 bg-white/5 rounded-lg animate-pulse"></div>
-                      <div className="h-8 w-8 bg-emerald-500/20 rounded-full"></div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="h-32 bg-gradient-to-br from-emerald-500/10 to-transparent border border-white/5 rounded-3xl p-6 space-y-3">
-                         <div className="h-2 w-16 bg-white/10 rounded animate-pulse"></div>
-                         <div className="h-6 w-24 bg-white/20 rounded"></div>
-                      </div>
-                      <div className="h-32 bg-white/5 border border-white/5 rounded-3xl p-6 space-y-3">
-                         <div className="h-2 w-16 bg-white/10 rounded animate-pulse"></div>
-                         <div className="h-6 w-24 bg-white/20 rounded"></div>
-                      </div>
-                    </div>
-                    <div className="h-40 bg-white/5 border border-white/5 rounded-3xl p-6 relative overflow-hidden">
-                       <div className="absolute bottom-0 left-0 w-full h-[60%] bg-gradient-to-t from-emerald-500/20 to-transparent"></div>
-                       <div className="h-2 w-24 bg-white/10 rounded mb-4"></div>
-                       <div className="h-4 w-32 bg-white/20 rounded"></div>
-                    </div>
-                  </div>
-                </div>
+              {/* Premium Mockup Container */}
+              <div className="relative z-20 bg-gradient-to-br from-white/10 to-transparent p-[1px] rounded-[40px] shadow-2xl backdrop-blur-3xl overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 via-transparent to-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-1000"></div>
+                <img 
+                  src="/dashboard_mockup.png" 
+                  alt="WealthFlow Dashboard" 
+                  className="rounded-[39px] w-full h-auto shadow-2xl transition-transform duration-1000 group-hover:scale-105"
+                />
               </div>
               
-              {/* Floating elements */}
-              <div className="absolute -top-10 -right-10 w-40 h-40 bg-emerald-500/20 blur-[60px] rounded-full animate-pulse"></div>
+              {/* Decorative elements behind image */}
+              <div className="absolute -top-20 -right-20 w-[300px] h-[300px] bg-emerald-500/20 blur-[100px] rounded-full animate-pulse -z-10"></div>
+              <div className="absolute -bottom-20 -left-20 w-[300px] h-[300px] bg-blue-500/20 blur-[100px] rounded-full animate-pulse -z-10"></div>
             </motion.div>
           </div>
         </div>
