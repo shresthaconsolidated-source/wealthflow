@@ -253,14 +253,14 @@ export default function FirePath({ history, accounts }: Props) {
                   setYears(val);
                   saveSettings({ years: val });
                 }}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all appearance-none text-center"
+                className="w-full bg-[#1c1c20] border border-white/10 rounded-2xl px-5 py-4 text-white font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all appearance-none text-center cursor-pointer"
               >
-                <option value={5}>5 Years</option>
-                <option value={10}>10 Years</option>
-                <option value={15}>15 Years</option>
-                <option value={20}>20 Years</option>
-                <option value={25}>25 Years</option>
-                <option value={30}>30 Years</option>
+                <option value={5} className="bg-[#1c1c20] text-white">5 Years</option>
+                <option value={10} className="bg-[#1c1c20] text-white">10 Years</option>
+                <option value={15} className="bg-[#1c1c20] text-white">15 Years</option>
+                <option value={20} className="bg-[#1c1c20] text-white">20 Years</option>
+                <option value={25} className="bg-[#1c1c20] text-white">25 Years</option>
+                <option value={30} className="bg-[#1c1c20] text-white">30 Years</option>
               </select>
             </div>
           </div>

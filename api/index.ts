@@ -454,24 +454,29 @@ app.get(["/api/user/settings", "/user/settings"], asyncHandler(async (req: any, 
 
 app.post(["/api/user/settings", "/user/settings"], asyncHandler(async (req: any, res: any) => {
   const userId = (req as any).user.id;
-  const { base_currency, fire_inflation, fire_years, fire_manual_investment, fire_manual_return, fire_planned_expenses } = req.body;
-
-  if (!base_currency) {
-    return res.status(400).json({ error: "base_currency is required" });
-  }
-
+  const updates = req.body;
+  
   try {
+    // Check for existing settings to merge if necessary, or just upsert partially
+    const { data: existing } = await supabase
+      .from('user_settings')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    const finalSettings = {
+      user_id: userId,
+      base_currency: updates.base_currency || existing?.base_currency || 'USD',
+      fire_inflation: updates.fire_inflation !== undefined ? updates.fire_inflation : existing?.fire_inflation,
+      fire_years: updates.fire_years !== undefined ? updates.fire_years : existing?.fire_years,
+      fire_manual_investment: updates.fire_manual_investment !== undefined ? updates.fire_manual_investment : existing?.fire_manual_investment,
+      fire_manual_return: updates.fire_manual_return !== undefined ? updates.fire_manual_return : existing?.fire_manual_return,
+      fire_planned_expenses: updates.fire_planned_expenses !== undefined ? updates.fire_planned_expenses : existing?.fire_planned_expenses,
+    };
+
     const { error } = await supabase
       .from('user_settings')
-      .upsert({
-        user_id: userId,
-        base_currency,
-        fire_inflation,
-        fire_years,
-        fire_manual_investment,
-        fire_manual_return,
-        fire_planned_expenses
-      }, { onConflict: 'user_id' });
+      .upsert(finalSettings, { onConflict: 'user_id' });
 
     if (error) {
       console.error("Error saving user settings:", error);
