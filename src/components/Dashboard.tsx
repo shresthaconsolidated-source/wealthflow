@@ -220,7 +220,14 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} tickFormatter={(val) => `${getCurrencySymbol()}${val / 1000}k`} width={35} />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#71717a', fontSize: 10 }} 
+                    tickFormatter={(val) => `${getCurrencySymbol()}${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`} 
+                    width={60}
+                    tickCount={6}
+                  />
                   <Tooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }} />
                   <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorNetWorth)" />
                 </AreaChart>

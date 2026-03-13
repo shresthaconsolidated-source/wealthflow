@@ -220,10 +220,10 @@ export default function Budgets() {
                 </div>
 
                 <div className="space-y-4 relative z-10 mt-8">
-                  <div className="flex justify-between items-end">
-                    <div>
+                  <div className="flex flex-wrap justify-between items-end gap-x-4 gap-y-2">
+                    <div className="min-w-0">
                       <p className={cn(
-                        "text-3xl font-black tracking-tight",
+                        "text-2xl lg:text-3xl font-black tracking-tight truncate",
                         isOver ? "text-red-400" : isNear ? "text-amber-400" : "text-emerald-400"
                       )}>
                         {formatCurrency(spent)}
@@ -231,8 +231,8 @@ export default function Budgets() {
                       <p className="text-xs text-zinc-500 font-bold mt-1">spent</p>
                     </div>
                     
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-zinc-300">
+                    <div className="text-right ml-auto">
+                      <p className="text-base lg:text-lg font-bold text-zinc-300">
                         {formatCurrency(limit)}
                       </p>
                       <p className="text-xs text-zinc-500 font-bold mt-1">budgeted</p>
