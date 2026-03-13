@@ -8,9 +8,6 @@ import Settings from '@/src/components/Settings';
 import Donations from '@/src/components/Donations';
 import AdminPulse from '@/src/components/AdminPulse';
 import Contact from '@/src/components/Contact';
-import Budgets from '@/src/components/Budgets';
-import OnboardingWizard from '@/src/components/OnboardingWizard';
-import { useApi } from '@/src/hooks/useApi';
 import { Wallet, Shield, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -23,31 +20,8 @@ const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '631803362356-e9sld8un
 
 export default function App() {
   const { user, loading, login } = useAuth();
-  const { fetchWithAuth } = useApi();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isAdminView, setIsAdminView] = useState(window.location.pathname === '/admin-pulse');
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [checkingNewUser, setCheckingNewUser] = useState(true);
-
-  useEffect(() => {
-    if (user && !isAdminView) {
-      // Check if user has accounts - if no accounts, they are a brand new user who needs onboarding
-      fetchWithAuth('/api/accounts')
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.length === 0) {
-             setShowOnboarding(true);
-          }
-          setCheckingNewUser(false);
-        })
-        .catch((err) => {
-           console.error("Failed checking new user status:", err);
-           setCheckingNewUser(false);
-        });
-    } else if (!user) {
-        setCheckingNewUser(true);
-    }
-  }, [user, isAdminView, fetchWithAuth]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -142,7 +116,7 @@ export default function App() {
             </p>
           </motion.div>
         </div>
-      ) : user && !showOnboarding ? (
+      ) : (
         <div className="min-h-screen bg-[#0A0A0B] text-zinc-100 flex flex-col lg:flex-row">
           <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
           <MobileHeader />
@@ -159,7 +133,6 @@ export default function App() {
               >
                 {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
                 {activeTab === 'transactions' && <Transactions setActiveTab={setActiveTab} />}
-                {activeTab === 'budgets' && <Budgets />}
                 {activeTab === 'analysis' && <Analysis />}
                 {activeTab === 'donations' && <Donations />}
                 {activeTab === 'settings' && <Settings />}
@@ -171,7 +144,7 @@ export default function App() {
           <FAB onClick={() => setActiveTab('transactions')} />
           <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
         </div>
-      ) : null}
+      )}
     </GoogleOAuthProvider>
   );
 }

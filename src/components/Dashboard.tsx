@@ -11,8 +11,7 @@ import {
   CreditCard,
   Briefcase,
   X,
-  ChevronRight,
-  Target
+  ChevronRight
 } from 'lucide-react';
 import {
   AreaChart,
@@ -220,22 +219,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} dy={10} />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#71717a', fontSize: 10 }} 
-                    tickFormatter={(val) => {
-                      const absoluteVal = Math.abs(val);
-                      const sign = val < 0 ? '-' : '';
-                      const symbol = getCurrencySymbol();
-                      if (absoluteVal >= 1000000) return `${sign}${symbol}${(absoluteVal / 1000000).toFixed(1)}M`;
-                      if (absoluteVal >= 1000) return `${sign}${symbol}${(absoluteVal / 1000).toFixed(0)}k`;
-                      return `${sign}${symbol}${absoluteVal}`;
-                    }} 
-                    width={80}
-                    domain={['auto', 'auto']}
-                    tickCount={6}
-                  />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} tickFormatter={(val) => `${getCurrencySymbol()}${val / 1000}k`} width={35} />
                   <Tooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }} />
                   <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorNetWorth)" />
                 </AreaChart>
@@ -363,82 +347,6 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
           <h3 className="text-lg lg:text-xl font-bold text-white mb-6">Smart Insights</h3>
           <InsightCards insights={smartInsights} maxShow={3} />
         </div>
-      </div>
-
-      <div className="bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h3 className="text-lg lg:text-xl font-bold text-white">Budget Tracking</h3>
-            <p className="text-zinc-500 text-xs mt-1">Monitor your monthly spending across categories.</p>
-          </div>
-          <button 
-            onClick={() => setActiveTab('budgets')}
-            className="text-emerald-400 text-xs font-bold uppercase tracking-wider hover:text-emerald-300 transition-colors"
-          >
-            Manage Budgets
-          </button>
-        </div>
-
-        {data.budgets && data.budgets.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {data.budgets
-              .sort((a: any, b: any) => (a.is_global ? -1 : 1))
-              .map((budget: any) => {
-                const percent = Math.min((budget.spent / budget.limit) * 100, 100);
-                const isOver = budget.spent > budget.limit;
-                const isGlobal = budget.is_global;
-                const cat = budget.categories || { name: 'All Expenses', icon: 'Target', color: '#10b981' };
-
-                return (
-                  <div key={budget.id} className={cn(
-                    "bg-white/5 rounded-2xl p-5 border",
-                    isGlobal ? "border-emerald-500/30 bg-emerald-500/5 shadow-lg shadow-emerald-500/5" : "border-white/5"
-                  )}>
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center",
-                          isGlobal ? "bg-emerald-500/20" : "bg-black/20"
-                        )} style={!isGlobal ? { color: cat.color } : {}}>
-                          <Target className={cn("w-5 h-5", isGlobal ? "text-emerald-400" : "")} />
-                        </div>
-                        <div>
-                          <p className="text-white font-bold text-sm">{isGlobal ? 'All Expenses' : cat.name}</p>
-                          <p className="text-zinc-500 text-[10px] uppercase tracking-widest">{isOver ? 'Over Budget' : isGlobal ? 'Total Monthly Limit' : 'On Track'}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-white font-bold text-sm">{formatCurrency(budget.spent)}</p>
-                        <p className="text-zinc-500 text-[10px]">of {formatCurrency(budget.limit)}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${percent}%` }}
-                        className={cn(
-                          "h-full rounded-full",
-                          isOver ? "bg-red-500" : percent > 80 ? "bg-amber-500" : "bg-emerald-500"
-                        )}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-12 border border-dashed border-white/10 rounded-[24px] text-zinc-500">
-            <Target className="w-12 h-12 mb-4 opacity-20" />
-            <p className="text-sm font-medium mb-4">No budgets set for this month.</p>
-            <button 
-              onClick={() => setActiveTab('budgets')}
-              className="px-6 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-all border border-white/5"
-            >
-              Set Your First Budget
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Health Score + Forecast */}

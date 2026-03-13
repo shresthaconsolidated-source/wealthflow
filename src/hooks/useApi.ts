@@ -13,7 +13,6 @@ export function useApi() {
             ...options.headers,
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
-            'x-base-currency': localStorage.getItem('base_currency') || 'USD',
         };
 
         try {
