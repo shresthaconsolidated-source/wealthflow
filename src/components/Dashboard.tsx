@@ -224,8 +224,16 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
                     axisLine={false} 
                     tickLine={false} 
                     tick={{ fill: '#71717a', fontSize: 10 }} 
-                    tickFormatter={(val) => `${getCurrencySymbol()}${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`} 
-                    width={60}
+                    tickFormatter={(val) => {
+                      const absoluteVal = Math.abs(val);
+                      const sign = val < 0 ? '-' : '';
+                      const symbol = getCurrencySymbol();
+                      if (absoluteVal >= 1000000) return `${sign}${symbol}${(absoluteVal / 1000000).toFixed(1)}M`;
+                      if (absoluteVal >= 1000) return `${sign}${symbol}${(absoluteVal / 1000).toFixed(0)}k`;
+                      return `${sign}${symbol}${absoluteVal}`;
+                    }} 
+                    width={80}
+                    domain={['auto', 'auto']}
                     tickCount={6}
                   />
                   <Tooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }} />

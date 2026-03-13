@@ -692,6 +692,8 @@ app.get(["/api/dashboard", "/dashboard"], async (req, res) => {
   const targetRate = rates[baseCurrency] || 1;
 
   const convert = (amount: number, fromCurrency: string) => {
+    // If no currency is recorded (legacy), assume it was already in the BASE currency 
+    // to prevent inflation (USD -> NPR multiplication errors)
     if (!fromCurrency || fromCurrency === baseCurrency) return amount;
     const sourceRate = rates[fromCurrency] || 1;
     return (amount / sourceRate) * targetRate;
@@ -759,6 +761,8 @@ app.get(["/api/dashboard/history", "/dashboard/history"], async (req, res) => {
   const targetRate = rates[baseCurrency] || 1;
 
   const convert = (amount: number, fromCurrency: string) => {
+    // If no currency is recorded (legacy), assume it was already in the BASE currency 
+    // to prevent inflation (USD -> NPR multiplication errors)
     if (!fromCurrency || fromCurrency === baseCurrency) return amount;
     const sourceRate = rates[fromCurrency] || 1;
     return (amount / sourceRate) * targetRate;
@@ -806,11 +810,12 @@ app.post(["/api/maintenance/sync-balances", "/maintenance/sync-balances"], async
     for (const acc of accounts) {
       let netChange = 0;
       for (const t of (txs || [])) {
-        if (t.type === 'income' && t.to_account_id === acc.id) netChange += Number(t.amount);
-        if (t.type === 'expense' && t.from_account_id === acc.id) netChange -= Number(t.amount);
+        const amount = Number((t as any).amount_base || t.amount);
+        if (t.type === 'income' && t.to_account_id === acc.id) netChange += amount;
+        if (t.type === 'expense' && t.from_account_id === acc.id) netChange -= amount;
         if (t.type === 'transfer') {
-          if (t.to_account_id === acc.id) netChange += Number(t.amount);
-          if (t.from_account_id === acc.id) netChange -= Number(t.amount);
+          if (t.to_account_id === acc.id) netChange += amount;
+          if (t.from_account_id === acc.id) netChange -= amount;
         }
       }
 

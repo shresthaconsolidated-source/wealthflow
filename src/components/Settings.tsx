@@ -185,6 +185,26 @@ export default function Settings() {
   };
 
 
+  const [isRepairing, setIsRepairing] = useState(false);
+
+  const handleRepairData = async () => {
+    setIsRepairing(true);
+    try {
+      const res = await fetchWithAuth('/api/maintenance/sync-balances', { method: 'POST' });
+      if (res.ok) {
+        showSuccess('Data reconciliation complete! All account balances have been synced with your transactions.');
+        fetchData();
+      } else {
+        showError('Repair failed. Please try again.');
+      }
+    } catch (e) {
+      console.error('Repair error:', e);
+      showError('Repair failed due to a network error.');
+    } finally {
+      setIsRepairing(false);
+    }
+  };
+
   const handleExport = async () => {
     try {
       const res = await fetchWithAuth('/api/transactions/export');
@@ -436,17 +456,36 @@ export default function Settings() {
             </div>
             
 
-            <div className="p-8 rounded-3xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/10 flex flex-col justify-between gap-6 md:col-span-2">
-              <div className="flex justify-between items-center">
+            <div className="p-8 rounded-3xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/10 flex flex-col gap-8 md:col-span-2">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div>
                   <p className="text-white font-bold text-base">Full Data Export</p>
                   <p className="text-zinc-500 text-sm mt-2">Download all your transaction history for backup or external analysis.</p>
                 </div>
                 <button 
                   onClick={handleExport}
-                  className="px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-white text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-white/10 transition-colors"
+                  className="px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-white text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-white/10 transition-colors w-full md:w-auto justify-center"
                 >
                   <Download className="w-5 h-5 text-blue-400" /> Export All Data
+                </button>
+              </div>
+
+              <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div>
+                  <p className="text-white font-bold text-base">Reconcile & Repair Data</p>
+                  <p className="text-zinc-500 text-sm mt-2">Recalculate all account balances based on your transaction history. Use this if your totals seem incorrect.</p>
+                </div>
+                <button 
+                  onClick={handleRepairData}
+                  disabled={isRepairing}
+                  className="px-8 py-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-amber-500/20 transition-all w-full md:w-auto justify-center disabled:opacity-50"
+                >
+                  {isRepairing ? (
+                    <div className="w-5 h-5 border-2 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+                  ) : (
+                    <Download className="w-5 h-5 opacity-50 rotate-180" />
+                  )}
+                  {isRepairing ? 'Repairing...' : 'Repair Balances'}
                 </button>
               </div>
             </div>
