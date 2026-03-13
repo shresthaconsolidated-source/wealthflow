@@ -93,24 +93,31 @@ export default function FirePath({ history, accounts }: Props) {
   // Calculations
   // FV = P * (1 + r)^n + PMT * [((1 + r)^n - 1) / r]
   const n = years;
-  const r = effectiveReturn / 100 / 12; // monthly rate
   const months = n * 12;
   const pmt = Math.max(0, effectiveInvestment);
   
-  const futureValueNominal = currentNetWorth * Math.pow(1 + r, months) + 
-                            pmt * ((Math.pow(1 + r, months) - 1) / r);
+  // Nominal Math (Actual bank balance in the future)
+  const rNominal = effectiveReturn / 100 / 12; // monthly rate
+  const futureValueNominal = currentNetWorth * Math.pow(1 + rNominal, months) + 
+                            pmt * ((Math.pow(1 + rNominal, months) - 1) / rNominal);
 
-  // Adjusted for inflation (Real value in today's terms)
-  const inflationRate = inflation / 100 / 12;
-  const futureValueReal = futureValueNominal / Math.pow(1 + inflationRate, months);
+  // Real Math (Value in today's terms, assuming contributions grow with inflation)
+  const realMonthlyRate = (effectiveReturn - inflation) / 100 / 12;
+  const futureValueReal = currentNetWorth * Math.pow(1 + realMonthlyRate, months) + 
+                            pmt * ((Math.pow(1 + realMonthlyRate, months) - 1) / realMonthlyRate);
 
+  // Passive Income Logic
+  // Real Passive Income: (Real Balance * Real Annual Rate) / 12
+  const realAnnualRate = (effectiveReturn - inflation) / 100;
+  const monthlyPassiveReal = (futureValueReal * realAnnualRate) / 12;
+  
+  // Nominal Passive (just for the bank balance card)
   const monthlyPassiveIncome = (futureValueNominal * (effectiveReturn / 100)) / 12;
-  const monthlyPassiveReal = monthlyPassiveIncome / Math.pow(1 + inflationRate, months);
 
   // Safe Withdrawal Rate (SWR) logic
   const safeWithdrawalPct = Math.max(0, effectiveReturn - inflation);
   const safeAnnualWithdrawal = futureValueNominal * (safeWithdrawalPct / 100);
-  const safeMonthlyWithdrawalToday = (safeAnnualWithdrawal / 12) / Math.pow(1 + inflationRate, months);
+  const safeMonthlyWithdrawalReal = (futureValueReal * (safeWithdrawalPct / 100)) / 12;
 
   const targetNetWorthReal = (effectiveExpenses * 12) / (safeWithdrawalPct / 100);
   
@@ -119,7 +126,6 @@ export default function FirePath({ history, accounts }: Props) {
   if (pmt > 0 || effectiveReturn > inflation) {
     let current = currentNetWorth;
     const target = targetNetWorthReal;
-    const realMonthlyRate = (effectiveReturn - inflation) / 100 / 12;
     
     if (current >= target) {
         yearsToRetire = 0;
@@ -371,7 +377,7 @@ export default function FirePath({ history, accounts }: Props) {
                     <ArrowRightLeft className="w-6 h-6 text-zinc-600" />
                     <div className="text-right">
                         <p className="text-zinc-400 text-xs font-bold uppercase tracking-wider mb-1">Monthly (Real Value)</p>
-                        <p className="text-emerald-400 font-bold text-lg">{formatCurrency(safeMonthlyWithdrawalToday)}</p>
+                        <p className="text-emerald-400 font-bold text-lg">{formatCurrency(safeMonthlyWithdrawalReal)}</p>
                     </div>
                 </div>
                 <p className="text-zinc-500 text-xs leading-relaxed italic">
