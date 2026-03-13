@@ -16,6 +16,7 @@ import MobileBottomNav from '@/src/components/MobileBottomNav';
 import MobileHeader from '@/src/components/MobileHeader';
 import FAB from '@/src/components/FAB';
 import LandingPage from '@/src/components/LandingPage';
+import DonationPopup from '@/src/components/DonationPopup';
 
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '631803362356-e9sld8untk9kh2hpgca6em5m3dpvngr3.apps.googleusercontent.com';
 
@@ -23,6 +24,7 @@ export default function App() {
   const { user, loading, login } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isAdminView, setIsAdminView] = useState(window.location.pathname === '/admin-pulse');
+  const [showDonationPopup, setShowDonationPopup] = useState(false);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -31,6 +33,24 @@ export default function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Donation Reminder Logic
+  useEffect(() => {
+    if (user) {
+      const lastShown = localStorage.getItem('last_donation_popup_shown');
+      const now = Date.now();
+      const twentyFourHours = 24 * 60 * 60 * 1000;
+
+      if (!lastShown || now - parseInt(lastShown) > twentyFourHours) {
+        // Delay slightly for better UX after login/load
+        const timer = setTimeout(() => {
+          setShowDonationPopup(true);
+          localStorage.setItem('last_donation_popup_shown', now.toString());
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [user]);
 
   const toggleAdmin = (show: boolean) => {
     setIsAdminView(show);
@@ -80,6 +100,15 @@ export default function App() {
 
           <FAB onClick={() => setActiveTab('transactions')} />
           <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+
+          <DonationPopup 
+            isOpen={showDonationPopup}
+            onClose={() => setShowDonationPopup(false)}
+            onDonate={() => {
+              setActiveTab('donations');
+              setShowDonationPopup(false);
+            }}
+          />
         </div>
       )}
     </GoogleOAuthProvider>
