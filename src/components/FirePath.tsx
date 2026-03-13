@@ -340,7 +340,7 @@ export default function FirePath({ history, accounts }: Props) {
           <div className="pt-8 border-t border-emerald-500/20 mt-8 relative z-10">
             <div className="flex justify-between items-center">
               <span className="text-emerald-300/80 text-xs font-bold uppercase tracking-widest">Monthly Investment</span>
-              <span className="text-white font-bold text-xl">{formatCurrency(pmt)}/mo</span>
+              <span className="text-white font-bold text-xl">{formatCurrency(effectiveInvestment)}/mo</span>
             </div>
           </div>
         </div>
