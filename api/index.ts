@@ -101,10 +101,8 @@ app.post(["/api/auth/google", "/auth/google"], async (req, res) => {
       // Seed default accounts
       const defaultAccounts = [
         { id: 'acc-1-' + googleId, user_id: googleId, name: 'Main Bank', type: 'bank', balance: 0, icon: 'Wallet', color: '#3b82f6' },
-        { id: 'acc-2-' + googleId, user_id: googleId, name: 'Bank 2', type: 'bank', balance: 0, icon: 'CreditCard', color: '#10b981' },
-        { id: 'acc-3-' + googleId, user_id: googleId, name: 'Petty Cash', type: 'cash', balance: 0, icon: 'DollarSign', color: '#f59e0b' },
-        { id: 'acc-4-' + googleId, user_id: googleId, name: 'Shares', type: 'asset', balance: 0, icon: 'Briefcase', color: '#6366f1' },
-        { id: 'acc-5-' + googleId, user_id: googleId, name: 'FD', type: 'asset', balance: 0, icon: 'Target', color: '#8b5cf6' }
+        { id: 'acc-2-' + googleId, user_id: googleId, name: 'Cash', type: 'cash', balance: 0, icon: 'DollarSign', color: '#10b981' },
+        { id: 'acc-3-' + googleId, user_id: googleId, name: 'Fixed Deposits', type: 'asset', balance: 0, icon: 'Briefcase', color: '#f59e0b' }
       ];
 
       // Seed default categories
