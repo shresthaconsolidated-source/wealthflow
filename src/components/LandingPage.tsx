@@ -77,7 +77,7 @@ export default function LandingPage({ onLoginSuccess }: Props) {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
-                  className="text-6xl md:text-[5rem] lg:text-[6rem] font-black tracking-tighter leading-[0.9] text-white"
+                  className="text-5xl sm:text-6xl md:text-[5rem] lg:text-[6rem] font-black tracking-tighter leading-[0.9] text-white"
                 >
                   MASTER YOUR <br />
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-emerald-500 to-blue-600">FREEDOM.</span>
