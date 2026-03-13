@@ -218,8 +218,15 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} tickFormatter={(val) => `${getCurrencySymbol()}${val / 1000}k`} width={35} />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#a1a1aa', fontSize: 11, fontWeight: 500 }} dy={10} />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#a1a1aa', fontSize: 11, fontWeight: 500 }} 
+                    tickFormatter={(val) => `${getCurrencySymbol()}${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`} 
+                    width={70}
+                    domain={['dataMin * 0.8', 'auto']}
+                  />
                   <Tooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }} />
                   <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorNetWorth)" />
                 </AreaChart>
@@ -327,8 +334,15 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={flowData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 10 }} tickFormatter={(val) => `${getCurrencySymbol()}${val / 1000}k`} width={35} />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#a1a1aa', fontSize: 11, fontWeight: 500 }} dy={10} />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#a1a1aa', fontSize: 11, fontWeight: 500 }} 
+                    tickFormatter={(val) => `${getCurrencySymbol()}${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`} 
+                    width={70}
+                    domain={['dataMin * 0.8', 'auto']}
+                  />
                   <Tooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }} />
                   <Bar dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]} />

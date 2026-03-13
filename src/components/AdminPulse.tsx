@@ -124,7 +124,7 @@ export default function AdminPulse({ onBack }: { onBack: () => void }) {
                     dataKey="name" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fill: '#71717a', fontSize: 11 }} 
+                    tick={{ fill: '#a1a1aa', fontSize: 11, fontWeight: 500 }} 
                   />
                   <YAxis hide />
                   <Tooltip 

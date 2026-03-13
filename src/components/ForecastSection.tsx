@@ -105,8 +105,15 @@ export default function ForecastSection({ forecast, history, compact = false }: 
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                            <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} tickFormatter={v => `${getCurrencySymbol()}${(v / 1000).toFixed(0)}k`} width={45} />
+                            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#a1a1aa', fontWeight: 500 }} axisLine={false} tickLine={false} />
+                            <YAxis 
+                                tick={{ fontSize: 11, fill: '#a1a1aa', fontWeight: 500 }} 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tickFormatter={v => `${getCurrencySymbol()}${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} 
+                                width={70} 
+                                domain={['dataMin * 0.8', 'auto']}
+                            />
                             <Tooltip content={<CustomTooltip />} />
                             <Area dataKey="actual" name="Actual" fill="rgba(52,211,153,0.08)" stroke="#34D399" strokeWidth={2} dot={false} connectNulls />
                             <Line dataKey="conservative" name="Conservative" stroke="#71717a" strokeWidth={1.5} strokeDasharray="4 4" dot={false} connectNulls />
