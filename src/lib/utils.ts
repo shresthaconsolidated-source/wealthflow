@@ -5,15 +5,14 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number) {
-  const currencyCode = (typeof window !== 'undefined' && localStorage.getItem('base_currency')) || 'USD';
+export function formatCurrency(amount: number, currencyCode?: string) {
+  const code = currencyCode || (typeof window !== 'undefined' && localStorage.getItem('base_currency')) || 'USD';
   try {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currencyCode,
+      currency: code,
     }).format(amount);
   } catch (e) {
-    // Fallback in case of invalid currency code
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -21,12 +20,12 @@ export function formatCurrency(amount: number) {
   }
 }
 
-export function getCurrencySymbol() {
-  const currencyCode = (typeof window !== 'undefined' && localStorage.getItem('base_currency')) || 'USD';
+export function getCurrencySymbol(currencyCode?: string) {
+  const code = currencyCode || (typeof window !== 'undefined' && localStorage.getItem('base_currency')) || 'USD';
   try {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currencyCode,
+      currency: code,
     }).format(0).replace(/[0-9.,\s]/g, '');
   } catch (e) {
     return '$';

@@ -473,6 +473,8 @@ app.post(["/api/user/settings", "/user/settings"], asyncHandler(async (req: any,
       fire_manual_return: updates.fire_manual_return !== undefined ? updates.fire_manual_return : existing?.fire_manual_return,
       fire_planned_expenses: updates.fire_planned_expenses !== undefined ? updates.fire_planned_expenses : existing?.fire_planned_expenses,
       fire_step_up: updates.fire_step_up !== undefined ? updates.fire_step_up : existing?.fire_step_up,
+      fire_manual_starting_capital: updates.fire_manual_starting_capital !== undefined ? updates.fire_manual_starting_capital : existing?.fire_manual_starting_capital,
+      fire_bulk_events: updates.fire_bulk_events !== undefined ? updates.fire_bulk_events : (existing?.fire_bulk_events || []),
     };
 
     const { error } = await supabase
