@@ -21,6 +21,8 @@ interface Props {
 export default function FirePath({ history, accounts }: Props) {
   const { fetchWithAuth } = useApi();
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<number | null>(null);
   
   // Settings
   const [inflation, setInflation] = useState(5.0); // Default 5%
@@ -61,17 +63,32 @@ export default function FirePath({ history, accounts }: Props) {
   }, [fetchWithAuth]);
 
   const saveSettings = (updates: any) => {
+    setSaving(true);
     fetchWithAuth('/api/user/settings', {
       method: 'POST',
-      body: JSON.stringify({
-        fire_inflation: updates.inflation ?? inflation,
-        fire_years: updates.years ?? years,
-        fire_manual_investment: updates.manualInvestment ?? manualInvestment,
-        fire_manual_return: updates.manualReturn ?? manualReturn,
-        fire_planned_expenses: updates.plannedExpenses ?? plannedExpenses,
-      })
-    });
+      body: JSON.stringify(updates)
+    })
+    .then(() => {
+      setSaving(false);
+      setLastSaved(Date.now());
+    })
+    .catch(() => setSaving(false));
   };
+
+  // Debounce saving
+  useEffect(() => {
+    if (loading) return; // Don't save on initial load
+    const timer = setTimeout(() => {
+      saveSettings({
+        fire_inflation: inflation,
+        fire_years: years,
+        fire_manual_investment: manualInvestment,
+        fire_manual_return: manualReturn,
+        fire_planned_expenses: plannedExpenses,
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [inflation, years, manualInvestment, manualReturn, plannedExpenses]);
 
   // Calculations
   // FV = P * (1 + r)^n + PMT * [((1 + r)^n - 1) / r]
@@ -127,7 +144,11 @@ export default function FirePath({ history, accounts }: Props) {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-white tracking-tight">FIRE Path Projections</h2>
-              <p className="text-zinc-500 text-sm">Visualize your journey to financial freedom.</p>
+              <div className="flex items-center gap-2">
+                <p className="text-zinc-500 text-sm">Visualize your journey to financial freedom.</p>
+                {saving && <span className="text-[10px] font-bold text-orange-500 animate-pulse uppercase tracking-widest bg-orange-500/10 px-2 py-0.5 rounded-md">Saving...</span>}
+                {!saving && lastSaved && <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest bg-emerald-500/10 px-2 py-0.5 rounded-md">Saved</span>}
+              </div>
             </div>
           </div>
 
@@ -139,7 +160,6 @@ export default function FirePath({ history, accounts }: Props) {
                     onClick={() => {
                         const val = manualInvestment === null ? Math.round(avgMonthlySavings) : null;
                         setManualInvestment(val);
-                        saveSettings({ manualInvestment: val });
                     }}
                     className="text-emerald-400 hover:underline"
                 >
@@ -154,7 +174,6 @@ export default function FirePath({ history, accounts }: Props) {
                   onChange={(e) => {
                     const val = Number(e.target.value);
                     setManualInvestment(val);
-                    saveSettings({ manualInvestment: val });
                   }}
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all disabled:opacity-50"
                   placeholder="0"
@@ -170,7 +189,6 @@ export default function FirePath({ history, accounts }: Props) {
                   onClick={() => {
                     const val = plannedExpenses === null ? Math.round(avgExpenses) : null;
                     setPlannedExpenses(val);
-                    saveSettings({ plannedExpenses: val });
                   }}
                   className="text-emerald-400 hover:underline"
                 >
@@ -185,7 +203,6 @@ export default function FirePath({ history, accounts }: Props) {
                   onChange={(e) => {
                     const val = Number(e.target.value);
                     setPlannedExpenses(val);
-                    saveSettings({ plannedExpenses: val });
                   }}
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all disabled:opacity-50"
                   placeholder="0"
@@ -201,7 +218,6 @@ export default function FirePath({ history, accounts }: Props) {
                   onClick={() => {
                     const val = manualReturn === null ? historicalReturn : null;
                     setManualReturn(val);
-                    saveSettings({ manualReturn: val });
                   }}
                   className="text-emerald-400 hover:underline"
                 >
@@ -217,7 +233,6 @@ export default function FirePath({ history, accounts }: Props) {
                   onChange={(e) => {
                     const val = Number(e.target.value);
                     setManualReturn(val);
-                    saveSettings({ manualReturn: val });
                   }}
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all disabled:opacity-50"
                   placeholder="12.0"
@@ -236,7 +251,6 @@ export default function FirePath({ history, accounts }: Props) {
                   onChange={(e) => {
                     const val = Number(e.target.value);
                     setInflation(val);
-                    saveSettings({ inflation: val });
                   }}
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
                 />
@@ -251,7 +265,6 @@ export default function FirePath({ history, accounts }: Props) {
                 onChange={(e) => {
                   const val = Number(e.target.value);
                   setYears(val);
-                  saveSettings({ years: val });
                 }}
                 className="w-full bg-[#1c1c20] border border-white/10 rounded-2xl px-5 py-4 text-white font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all appearance-none text-center cursor-pointer"
               >
