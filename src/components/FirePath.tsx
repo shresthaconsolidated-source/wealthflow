@@ -491,7 +491,6 @@ export default function FirePath({ history, accounts }: Props) {
                         {yearsToRetire <= 0 ? "Retire Today" : `Retire in ${yearsToRetire.toFixed(1)} years`}
                     </h3>
                     <p className="text-emerald-200/60 text-sm leading-relaxed">
-                        Reaching {formatCurrency(targetNetWorthReal)} in today's money will cover your {formatCurrency(effectiveExpenses)} monthly spend forever.
                         Reaching {formatCurrency(targetNetWorthReal, baseCurrency)} in today's money will cover your {formatCurrency(effectiveExpenses, baseCurrency)} monthly spend forever.
                     </p>
                 </div>
