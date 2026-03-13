@@ -82,9 +82,8 @@ export default function Donations() {
 
                     <div className="p-4 bg-white rounded-3xl shadow-2xl shadow-emerald-500/10 transition-transform hover:scale-[1.02] duration-500">
                         <div className="w-56 h-56 lg:w-64 lg:h-64 bg-zinc-100 rounded-2xl flex items-center justify-center overflow-hidden border-8 border-white">
-                            {/* Using a placeholder image for the QR code */}
                             <img
-                                src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=ashishoct35"
+                                src="/qr.jpeg"
                                 alt="eSewa QR Code"
                                 className="w-full h-full object-contain"
                             />
