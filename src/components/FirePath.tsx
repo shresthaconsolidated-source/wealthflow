@@ -30,6 +30,7 @@ export default function FirePath({ history, accounts }: Props) {
   const [manualInvestment, setManualInvestment] = useState<number | null>(null);
   const [manualReturn, setManualReturn] = useState<number | null>(null);
   const [plannedExpenses, setPlannedExpenses] = useState<number | null>(null);
+  const [stepUp, setStepUp] = useState(0); // Annual % increase in investment
 
   // Derived from history
   const currentNetWorth = accounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
@@ -57,6 +58,7 @@ export default function FirePath({ history, accounts }: Props) {
         if (settings.fire_manual_investment !== undefined) setManualInvestment(settings.fire_manual_investment);
         if (settings.fire_manual_return !== undefined) setManualReturn(settings.fire_manual_return);
         if (settings.fire_planned_expenses !== undefined) setPlannedExpenses(settings.fire_planned_expenses);
+        if (settings.fire_step_up !== undefined) setStepUp(Number(settings.fire_step_up));
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -85,57 +87,69 @@ export default function FirePath({ history, accounts }: Props) {
         fire_manual_investment: manualInvestment,
         fire_manual_return: manualReturn,
         fire_planned_expenses: plannedExpenses,
+        fire_step_up: stepUp,
       });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [inflation, years, manualInvestment, manualReturn, plannedExpenses]);
+  }, [inflation, years, manualInvestment, manualReturn, plannedExpenses, stepUp]);
 
-  // Calculations
-  // FV = P * (1 + r)^n + PMT * [((1 + r)^n - 1) / r]
-  const n = years;
-  const months = n * 12;
-  const pmt = Math.max(0, effectiveInvestment);
-  
-  // Nominal Math (Actual bank balance in the future)
-  const rNominal = effectiveReturn / 100 / 12; // monthly rate
-  const futureValueNominal = currentNetWorth * Math.pow(1 + rNominal, months) + 
-                            pmt * ((Math.pow(1 + rNominal, months) - 1) / rNominal);
+  // Calculations via simulation (Loop) for precision with step-ups
+  const targetMonths = years * 12;
+  const monthlyReturn = effectiveReturn / 100 / 12;
+  const monthlyInflation = inflation / 100 / 12;
+  const annualStepUpFactor = 1 + (stepUp / 100);
 
-  // Real Math (Value in today's terms, assuming contributions grow with inflation)
-  const realMonthlyRate = (effectiveReturn - inflation) / 100 / 12;
-  const futureValueReal = currentNetWorth * Math.pow(1 + realMonthlyRate, months) + 
-                            pmt * ((Math.pow(1 + realMonthlyRate, months) - 1) / realMonthlyRate);
+  let currentNominal = currentNetWorth;
+  let currentRealContribution = effectiveInvestment;
+
+  // Simulate month by month
+  for (let m = 1; m <= targetMonths; m++) {
+    // 1. Add investment (at start or end of month? Let's say end)
+    currentNominal = currentNominal * (1 + monthlyReturn) + currentRealContribution;
+    
+    // 2. Step up investment every 12 months
+    if (m % 12 === 0) {
+        currentRealContribution = currentRealContribution * annualStepUpFactor;
+    }
+  }
+
+  const futureValueNominal = currentNominal;
+  // Today's value is simply future value discounted by inflation
+  const futureValueReal = futureValueNominal / Math.pow(1 + monthlyInflation, targetMonths);
 
   // Passive Income Logic
-  // Real Passive Income: (Real Balance * Real Annual Rate) / 12
-  const realAnnualRate = (effectiveReturn - inflation) / 100;
-  const monthlyPassiveReal = (futureValueReal * realAnnualRate) / 12;
-  
-  // Nominal Passive (just for the bank balance card)
-  const monthlyPassiveIncome = (futureValueNominal * (effectiveReturn / 100)) / 12;
+  const monthlyYieldRate = (effectiveReturn / 100) / 12;
+  const monthlyPassiveIncome = futureValueNominal * monthlyYieldRate;
+  const monthlyPassiveReal = monthlyPassiveIncome / Math.pow(1 + monthlyInflation, targetMonths);
 
   // Safe Withdrawal Rate (SWR) logic
   const safeWithdrawalPct = Math.max(0, effectiveReturn - inflation);
-  const safeAnnualWithdrawal = futureValueNominal * (safeWithdrawalPct / 100);
   const safeMonthlyWithdrawalReal = (futureValueReal * (safeWithdrawalPct / 100)) / 12;
 
   const targetNetWorthReal = (effectiveExpenses * 12) / (safeWithdrawalPct / 100);
   
-  // Estimate years to target
+  // Estimate years to target via simulation
   let yearsToRetire = 0;
-  if (pmt > 0 || effectiveReturn > inflation) {
-    let current = currentNetWorth;
-    const target = targetNetWorthReal;
+  if (effectiveInvestment > 0 || effectiveReturn > inflation) {
+    let simNominal = currentNetWorth;
+    let simContribution = effectiveInvestment;
+    let m = 0;
     
-    if (current >= target) {
-        yearsToRetire = 0;
-    } else {
-        let m = 0;
-        while (current < target && m < 1200) {
-            current = current * (1 + realMonthlyRate) + pmt;
-            m++;
+    // Target moves with inflation if we think in nominal terms, 
+    // but easier to check if Real Worth > targetNetWorthReal
+    while (m < 1200) { // Max 100 years
+        const currentRealWorth = simNominal / Math.pow(1 + monthlyInflation, m);
+        if (currentRealWorth >= targetNetWorthReal) {
+            yearsToRetire = m / 12;
+            break;
         }
-        yearsToRetire = m / 12;
+        
+        simNominal = simNominal * (1 + monthlyReturn) + simContribution;
+        m++;
+        
+        if (m % 12 === 0) {
+            simContribution = simContribution * annualStepUpFactor;
+        }
     }
   }
 
@@ -264,7 +278,7 @@ export default function FirePath({ history, accounts }: Props) {
               </div>
             </div>
 
-            <div className="space-y-2 sm:col-span-2">
+            <div className="space-y-2">
               <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Time Horizon</label>
               <select 
                 value={years}
@@ -281,6 +295,24 @@ export default function FirePath({ history, accounts }: Props) {
                 <option value={25} className="bg-[#1c1c20] text-white">25 Years</option>
                 <option value={30} className="bg-[#1c1c20] text-white">30 Years</option>
               </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Annual Step-up</label>
+              <div className="relative group">
+                <input 
+                  type="number"
+                  step="0.1"
+                  value={stepUp}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setStepUp(val);
+                  }}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  placeholder="0"
+                />
+                <span className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">%</span>
+              </div>
             </div>
           </div>
         </div>

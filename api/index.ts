@@ -472,6 +472,7 @@ app.post(["/api/user/settings", "/user/settings"], asyncHandler(async (req: any,
       fire_manual_investment: updates.fire_manual_investment !== undefined ? updates.fire_manual_investment : existing?.fire_manual_investment,
       fire_manual_return: updates.fire_manual_return !== undefined ? updates.fire_manual_return : existing?.fire_manual_return,
       fire_planned_expenses: updates.fire_planned_expenses !== undefined ? updates.fire_planned_expenses : existing?.fire_planned_expenses,
+      fire_step_up: updates.fire_step_up !== undefined ? updates.fire_step_up : existing?.fire_step_up,
     };
 
     const { error } = await supabase
