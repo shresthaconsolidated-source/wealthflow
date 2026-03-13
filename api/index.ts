@@ -454,7 +454,7 @@ app.get(["/api/user/settings", "/user/settings"], asyncHandler(async (req: any, 
 
 app.post(["/api/user/settings", "/user/settings"], asyncHandler(async (req: any, res: any) => {
   const userId = (req as any).user.id;
-  const { base_currency } = req.body;
+  const { base_currency, fire_inflation, fire_years, fire_manual_investment, fire_manual_return } = req.body;
 
   if (!base_currency) {
     return res.status(400).json({ error: "base_currency is required" });
@@ -463,7 +463,14 @@ app.post(["/api/user/settings", "/user/settings"], asyncHandler(async (req: any,
   try {
     const { error } = await supabase
       .from('user_settings')
-      .upsert({ user_id: userId, base_currency }, { onConflict: 'user_id' });
+      .upsert({
+        user_id: userId,
+        base_currency,
+        fire_inflation,
+        fire_years,
+        fire_manual_investment,
+        fire_manual_return
+      }, { onConflict: 'user_id' });
 
     if (error) {
       console.error("Error saving user settings:", error);

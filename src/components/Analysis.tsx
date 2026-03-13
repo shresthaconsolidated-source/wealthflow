@@ -5,7 +5,8 @@ import {
   RefreshCw,
   TrendingUp,
   Activity,
-  Heart
+  Heart,
+  Flame
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
 import { motion } from 'motion/react';
@@ -14,12 +15,13 @@ import InsightCards from './InsightCards';
 import ForecastSection from './ForecastSection';
 import HealthScoreCard from './HealthScoreCard';
 import RecurringSection from './RecurringSection';
+import FirePath from './FirePath';
 import { generateInsights } from '@/src/lib/insightsEngine';
 import { computeForecast } from '@/src/lib/forecastEngine';
 import { computeHealthScore } from '@/src/lib/healthScoreEngine';
 import { detectRecurring } from '@/src/lib/recurringDetectionEngine';
 
-type Tab = 'insights' | 'forecast' | 'health' | 'recurring';
+type Tab = 'insights' | 'forecast' | 'health' | 'recurring' | 'fire';
 type TimeRange = 'monthly' | 'quarterly' | 'yearly';
 
 export default function Analysis() {
@@ -58,6 +60,7 @@ export default function Analysis() {
     { id: 'forecast', label: 'Forecast', icon: TrendingUp },
     { id: 'health', label: 'Health Score', icon: Heart },
     { id: 'recurring', label: 'Recurring', icon: RefreshCw },
+    { id: 'fire', label: 'FIRE Path', icon: Flame },
   ];
 
   const TIME_TABS: { id: TimeRange; label: string }[] = [
@@ -147,6 +150,10 @@ export default function Analysis() {
             </div>
             <RecurringSection result={recurringResult} />
           </div>
+        )}
+
+        {activeTab === 'fire' && (
+          <FirePath history={history} accounts={accounts} />
         )}
       </motion.div>
     </div>
