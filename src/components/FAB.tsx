@@ -11,12 +11,13 @@ export default function FAB({ onClick }: FABProps) {
     <motion.button
       initial={{ scale: 0, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
+      transition={{ delay: 0.3, type: 'spring', bounce: 0.4 }}
+      whileTap={{ scale: 0.92 }}
       onClick={onClick}
-      className="lg:hidden fixed bottom-24 right-6 z-50 w-14 h-14 rounded-2xl bg-emerald-500 text-white shadow-2xl shadow-emerald-500/40 flex items-center justify-center transition-all duration-300 active:bg-emerald-600"
+      aria-label="Add transaction"
+      className="lg:hidden fixed bottom-[92px] right-5 z-50 w-14 h-14 rounded-[20px] bg-[var(--accent)] text-[#04140e] shadow-[0_12px_28px_-8px_var(--accent-ring)] flex items-center justify-center active:bg-[var(--accent-strong)]"
     >
-      <Plus className="w-7 h-7" />
+      <Plus className="w-6 h-6" strokeWidth={2.5} />
     </motion.button>
   );
 }

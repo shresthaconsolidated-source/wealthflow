@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Zap, Sparkles, CheckCircle, Edit3, X } from 'lucide-react';
+import { Send, Sparkles, CheckCircle, Edit3, X, AlertTriangle } from 'lucide-react';
 import { parseTransactionMessage, type ParsedTransaction } from '@/src/lib/transactionParser';
 import { QUICK_ACTIONS, type QuickAction } from '@/src/lib/quickEntryConfig';
 import { formatCurrency, cn, getCurrencySymbol } from '@/src/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { Button, Modal } from '@/src/components/ui';
 
 interface Props {
   accounts: any[];
@@ -14,19 +15,31 @@ interface Props {
   onNavigate: () => void;
 }
 
-const TYPE_COLORS = {
-  income: 'emerald',
-  expense: 'red',
-  transfer: 'blue',
-};
-
 const TYPE_LABELS = {
   income: 'Income',
   expense: 'Expense',
   transfer: 'Transfer',
 };
 
-export default function SmartTransactionInput({ accounts, categories, transactions, onConfirm, onEditManual, onNavigate }: Props) {
+const TYPE_TEXT: Record<string, string> = {
+  income: 'text-[var(--accent)]',
+  expense: 'text-[var(--danger)]',
+  transfer: 'text-blue-400',
+};
+
+const TYPE_BG: Record<string, string> = {
+  income: 'bg-[var(--accent-soft)] border-[var(--accent)]/20',
+  expense: 'bg-[var(--danger-soft)] border-[var(--danger)]/20',
+  transfer: 'bg-blue-500/10 border-blue-500/20',
+};
+
+const TYPE_BADGE: Record<string, string> = {
+  income: 'bg-[var(--accent)]/20 text-[var(--accent)]',
+  expense: 'bg-[var(--danger)]/20 text-[var(--danger)]',
+  transfer: 'bg-blue-500/20 text-blue-400',
+};
+
+export default function SmartTransactionInput({ accounts, categories, transactions, onConfirm, onEditManual }: Props) {
   const [input, setInput] = useState('');
   const [parsed, setParsed] = useState<ParsedTransaction | null>(null);
   const [saving, setSaving] = useState(false);
@@ -62,7 +75,7 @@ export default function SmartTransactionInput({ accounts, categories, transactio
         if (t.type === 'expense' && t.note) {
           const rawNote = t.note.trim();
           const noteKey = rawNote.toLowerCase();
-          
+
           // Only track reasonably short notes to avoid absurdly long buttons
           if (noteKey.length > 0 && noteKey.length <= 20) {
               if (!noteFrequencies[noteKey]) {
@@ -92,7 +105,7 @@ export default function SmartTransactionInput({ accounts, categories, transactio
 
       // Check if a default action perfectly matches this note (case-insensitive)
       const matchingDefault = QUICK_ACTIONS.find(a => !usedDefaultIds.has(a.id) && a.label.toLowerCase() === note);
-      
+
       if (matchingDefault) {
         customActions.push(matchingDefault);
         usedDefaultIds.add(matchingDefault.id);
@@ -264,14 +277,12 @@ export default function SmartTransactionInput({ accounts, categories, transactio
     setSaving(false);
   };
 
-  const color = parsed ? TYPE_COLORS[parsed.type] : 'emerald';
-
   return (
     <div className="space-y-4">
       {/* --- Text Input Bar --- */}
-      <div className="relative">
-        <div className="flex items-center gap-3 bg-white/[0.03] border border-white/8 rounded-2xl px-4 py-3 focus-within:border-emerald-500/40 focus-within:ring-2 focus-within:ring-emerald-500/10 transition-all">
-          <Sparkles className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+      <div>
+        <div className="flex items-center gap-3 bg-[var(--surface-1)] border border-[var(--border-2)] rounded-2xl px-4 py-3.5 focus-within:border-[var(--accent)]/40 focus-within:ring-2 focus-within:ring-[var(--accent-ring)] transition-all">
+          <Sparkles className="w-4 h-4 text-[var(--accent)] shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -279,10 +290,10 @@ export default function SmartTransactionInput({ accounts, categories, transactio
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && parsed) handleConfirmParsed(); }}
             placeholder='Try: "lunch 450" or "salary 120000 to main bank"…'
-            className="flex-1 bg-transparent text-white text-sm placeholder:text-zinc-600 focus:outline-none"
+            className="flex-1 min-w-0 bg-transparent text-[var(--text-primary)] text-sm placeholder:text-[var(--text-tertiary)] focus:outline-none"
           />
           {input && (
-            <button onClick={() => { setInput(''); setParsed(null); }} className="text-zinc-600 hover:text-zinc-400">
+            <button onClick={() => { setInput(''); setParsed(null); }} className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] shrink-0">
               <X className="w-4 h-4" />
             </button>
           )}
@@ -290,73 +301,66 @@ export default function SmartTransactionInput({ accounts, categories, transactio
             onClick={parsed ? handleConfirmParsed : undefined}
             disabled={!parsed || saving}
             className={cn(
-              "p-1.5 rounded-lg transition-all",
-              parsed ? "bg-emerald-500 text-white hover:bg-emerald-400" : "text-zinc-700"
+              "p-2 rounded-lg transition-all shrink-0",
+              parsed ? "bg-[var(--accent)] text-[#04140e]" : "text-[var(--text-tertiary)]"
             )}
           >
             <Send className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Parse preview card */}
+        {/* Parse preview — sits in normal flow so it never covers quick-entry below on mobile */}
         <AnimatePresence>
           {parsed && (
             <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className={cn(
-                "absolute top-full left-0 right-0 mt-2 z-30 rounded-2xl border p-4 backdrop-blur-xl shadow-2xl",
-                parsed.type === 'income' ? "bg-emerald-500/10 border-emerald-500/20" :
-                  parsed.type === 'expense' ? "bg-red-500/10 border-red-500/20" :
-                    "bg-blue-500/10 border-blue-500/20"
-              )}
+              initial={{ opacity: 0, height: 0, marginTop: 0 }}
+              animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+              exit={{ opacity: 0, height: 0, marginTop: 0 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="overflow-hidden"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded-full",
-                      parsed.type === 'income' ? "bg-emerald-500/20 text-emerald-400" :
-                        parsed.type === 'expense' ? "bg-red-500/20 text-red-400" :
-                          "bg-blue-500/20 text-blue-400"
-                    )}>
-                      {TYPE_LABELS[parsed.type]}
-                    </span>
-                    <span className={cn(
-                      "text-xs px-2 py-0.5 rounded-full",
-                      parsed.confidence === 'high' ? "bg-emerald-500/10 text-emerald-500" :
-                        parsed.confidence === 'medium' ? "bg-amber-500/10 text-amber-500" :
-                          "bg-zinc-500/10 text-zinc-500"
-                    )}>
-                      {parsed.confidence} confidence
-                    </span>
+              <div className={cn("rounded-2xl border p-4", TYPE_BG[parsed.type])}>
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={cn("text-[11px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full", TYPE_BADGE[parsed.type])}>
+                        {TYPE_LABELS[parsed.type]}
+                      </span>
+                      <span className={cn(
+                        "text-[11px] px-2 py-0.5 rounded-full",
+                        parsed.confidence === 'high' ? "bg-[var(--accent-soft)] text-[var(--accent)]" :
+                          parsed.confidence === 'medium' ? "bg-[var(--gold-soft)] text-[var(--gold)]" :
+                            "bg-white/5 text-[var(--text-tertiary)]"
+                      )}>
+                        {parsed.confidence} confidence
+                      </span>
+                    </div>
+                    <p className="tnum text-2xl font-bold text-[var(--text-primary)]">{formatCurrency(parsed.amount)}</p>
+                    <div className="text-xs text-[var(--text-secondary)] flex flex-wrap gap-x-3 gap-y-1">
+                      {parsed.note && <span>📝 {parsed.note}</span>}
+                      {parsed.category_keyword && <span>🏷️ {parsed.category_keyword}</span>}
+                      {parsed.from_account_name && <span>From {parsed.from_account_name}</span>}
+                      {parsed.to_account_name && <span>To {parsed.to_account_name}</span>}
+                      <span>📅 {parsed.date}</span>
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold text-white">{formatCurrency(parsed.amount)}</p>
-                  <div className="text-xs text-zinc-400 space-x-3">
-                    {parsed.note && <span>📝 {parsed.note}</span>}
-                    {parsed.category_keyword && <span>🏷️ {parsed.category_keyword}</span>}
-                    {parsed.from_account_name && <span>From {parsed.from_account_name}</span>}
-                    {parsed.to_account_name && <span>To {parsed.to_account_name}</span>}
-                    <span>📅 {parsed.date}</span>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={handleConfirmParsed}
+                      disabled={saving}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-[var(--accent)] text-[#04140e] text-xs font-bold rounded-xl transition-all active:scale-95"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      {saving ? '…' : 'Confirm'}
+                    </button>
+                    <button
+                      onClick={handleEditParsed}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 text-[var(--text-primary)] text-xs font-bold rounded-xl transition-all active:scale-95"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      Edit
+                    </button>
                   </div>
-                </div>
-                <div className="flex flex-col gap-2 flex-shrink-0">
-                  <button
-                    onClick={handleConfirmParsed}
-                    disabled={saving}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold rounded-xl transition-all"
-                  >
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    {saving ? '...' : 'Confirm'}
-                  </button>
-                  <button
-                    onClick={handleEditParsed}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition-all"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    Edit
-                  </button>
                 </div>
               </div>
             </motion.div>
@@ -371,7 +375,7 @@ export default function SmartTransactionInput({ accounts, categories, transactio
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
-            className="flex items-center gap-2 text-emerald-400 text-sm font-medium px-2"
+            className="flex items-center gap-2 text-[var(--accent)] text-sm font-medium px-2"
           >
             <CheckCircle className="w-4 h-4" />
             Transaction saved!
@@ -381,235 +385,179 @@ export default function SmartTransactionInput({ accounts, categories, transactio
 
       {/* --- Quick Action Buttons --- */}
       <div>
-        <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-3 px-1">Quick Entry</p>
+        <p className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-3 px-1">Quick Entry</p>
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
           {dynamicActions.map(action => (
             <button
               key={action.id}
               onClick={() => { setQuickAction(action); setQuickAmount(''); setQuickNote(''); setQuickAccount(accounts[0]?.id || ''); }}
-              className="group flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.07] hover:border-white/10 transition-all text-center"
+              className="group flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-[var(--surface-1)] border border-[var(--border-1)] hover:border-[var(--border-2)] hover:bg-white/[0.05] active:scale-95 transition-all text-center"
             >
               <span className="text-2xl group-hover:scale-110 transition-transform">{action.emoji}</span>
-              <span className="text-[10px] font-bold text-zinc-400 group-hover:text-white transition-colors">{action.label}</span>
+              <span className="text-[10px] font-bold text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)] transition-colors truncate max-w-full">{action.label}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* --- Quick Entry Bottom Sheet --- */}
-      <AnimatePresence>
+      {/* --- Quick Entry Sheet --- */}
+      <Modal open={!!quickAction} onClose={() => setQuickAction(null)}>
         {quickAction && (
           <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setQuickAction(null)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
-            />
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-[#151518] border-t border-white/10 rounded-t-[32px] p-6 pb-10 shadow-2xl max-w-lg mx-auto"
-            >
-              <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl">{quickAction.emoji}</span>
-                  <div>
-                    <h3 className="text-white font-bold text-lg">{quickAction.label}</h3>
-                    <span className={cn(
-                      "text-xs font-bold uppercase tracking-widest",
-                      quickAction.type === 'income' ? "text-emerald-400" :
-                        quickAction.type === 'expense' ? "text-red-400" : "text-blue-400"
-                    )}>{TYPE_LABELS[quickAction.type]}</span>
-                  </div>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">{quickAction.emoji}</span>
+                <div>
+                  <h3 className="text-[var(--text-primary)] font-bold text-lg">{quickAction.label}</h3>
+                  <span className={cn("text-xs font-bold uppercase tracking-widest", TYPE_TEXT[quickAction.type])}>
+                    {TYPE_LABELS[quickAction.type]}
+                  </span>
                 </div>
-                <button onClick={() => setQuickAction(null)} className="p-2 rounded-xl bg-white/5 text-zinc-400 hover:text-white">
-                  <X className="w-5 h-5" />
-                </button>
               </div>
+              <button onClick={() => setQuickAction(null)} className="p-2 rounded-xl bg-white/5 text-[var(--text-tertiary)] hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              <div className="space-y-4">
-                {/* Amount */}
-                <div>
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Amount</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-lg">{getCurrencySymbol()}</span>
-                    <input
-                      autoFocus
-                      type="number"
-                      placeholder="0.00"
-                      value={quickAmount}
-                      onChange={e => setQuickAmount(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleQuickConfirm(); }}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl pl-10 pr-4 py-4 text-white text-xl font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* Account */}
-                <div>
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Account</label>
-                  <select
-                    value={quickAccount}
-                    onChange={e => setQuickAccount(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 [&>option]:bg-[#151518] [&>option]:text-white"
-                  >
-                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                  </select>
-                </div>
-
-                {/* Note */}
-                <div>
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Note (optional)</label>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-2 block">Amount</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] font-bold text-lg">{getCurrencySymbol()}</span>
                   <input
-                    type="text"
-                    placeholder={`e.g. ${quickAction.label}…`}
-                    value={quickNote}
-                    onChange={e => setQuickNote(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-600 transition-all"
+                    autoFocus
+                    type="number"
+                    placeholder="0.00"
+                    value={quickAmount}
+                    onChange={e => setQuickAmount(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleQuickConfirm(); }}
+                    className="w-full bg-[var(--surface-2)] border border-[var(--border-2)] rounded-2xl pl-10 pr-4 py-4 text-[var(--text-primary)] text-xl font-bold focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)] transition-all"
                   />
                 </div>
-
-                {/* Confirm */}
-                <button
-                  onClick={handleQuickConfirm}
-                  disabled={!quickAmount || saving}
-                  className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white font-bold rounded-2xl text-base transition-all shadow-lg shadow-emerald-500/20"
-                >
-                  {saving ? 'Saving…' : `Save ${quickAction.label}`}
-                </button>
               </div>
-            </motion.div>
+
+              <div>
+                <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-2 block">Account</label>
+                <select
+                  value={quickAccount}
+                  onChange={e => setQuickAccount(e.target.value)}
+                  className="w-full bg-[var(--surface-2)] border border-[var(--border-2)] rounded-2xl px-4 py-3 text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)] [&>option]:bg-[var(--surface-2)]"
+                >
+                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-2 block">Note (optional)</label>
+                <input
+                  type="text"
+                  placeholder={`e.g. ${quickAction.label}…`}
+                  value={quickNote}
+                  onChange={e => setQuickNote(e.target.value)}
+                  className="w-full bg-[var(--surface-2)] border border-[var(--border-2)] rounded-2xl px-4 py-3 text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)] placeholder:text-[var(--text-tertiary)] transition-all"
+                />
+              </div>
+
+              <Button onClick={handleQuickConfirm} disabled={!quickAmount || saving} className="w-full" size="lg">
+                {saving ? 'Saving…' : `Save ${quickAction.label}`}
+              </Button>
+            </div>
           </>
         )}
-      </AnimatePresence>
+      </Modal>
 
-      {/* ---- Clarification Modal ---- */}
-      <AnimatePresence>
+      {/* ---- Clarification Sheet ---- */}
+      <Modal open={!!clarifyData} onClose={() => setClarifyData(null)}>
         {clarifyData && (
           <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setClarifyData(null)}
-              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
-            />
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 z-[60] bg-[#151518] border-t border-white/10 rounded-t-[32px] p-6 pb-10 shadow-2xl max-w-lg mx-auto"
-            >
-              <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
+            <div className="flex items-start justify-between gap-3 mb-6">
+              <div>
+                <p className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--gold)] uppercase tracking-widest mb-1">
+                  <AlertTriangle className="w-3 h-3" /> Need a bit more info
+                </p>
+                <h3 className="text-[var(--text-primary)] font-bold text-lg">Confirm Details</h3>
+                <p className="text-[var(--text-tertiary)] text-sm mt-0.5">
+                  We parsed <span className="text-[var(--text-primary)] font-bold">{formatCurrency(clarifyData.parsed.amount)}</span> as{' '}
+                  <span className={cn('font-bold', TYPE_TEXT[clarifyData.parsed.type])}>a {clarifyData.parsed.type}</span>.
+                  Please confirm the missing fields below.
+                </p>
+              </div>
+              <button onClick={() => setClarifyData(null)} className="p-2 rounded-xl bg-white/5 text-[var(--text-tertiary)] hover:text-white shrink-0">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              {/* Header */}
-              <div className="flex items-start justify-between gap-3 mb-6">
+            <div className="space-y-6">
+              {clarifyData.needCategory && clarifyData.parsed.type !== 'transfer' && !clarifyData.resolvedCategoryId && (
                 <div>
-                  <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-1">⚠️ Need a bit more info</p>
-                  <h3 className="text-white font-bold text-lg">Confirm Details</h3>
-                  <p className="text-zinc-500 text-sm mt-0.5">
-                    We parsed <span className="text-white font-bold">{formatCurrency(clarifyData.parsed.amount)}</span> as a{' '}
-                    <span className={cn(
-                      'font-bold',
-                      clarifyData.parsed.type === 'income' ? 'text-emerald-400' :
-                        clarifyData.parsed.type === 'expense' ? 'text-red-400' : 'text-blue-400'
-                    )}>{clarifyData.parsed.type}</span>.
-                    Please confirm the missing fields below.
-                  </p>
+                  <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-3 block">Select Category</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {categories.filter(c => c.type === clarifyData.parsed.type).map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => handleClarifyConfirm({ resolvedCategoryId: c.id })}
+                        className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/5 border border-[var(--border-1)] hover:bg-white/10 hover:border-[var(--accent)]/30 transition-all text-left group"
+                      >
+                        <span className="w-2 h-2 rounded-full bg-[var(--accent)]/50 group-hover:bg-[var(--accent)]" />
+                        <span className="text-[var(--text-secondary)] text-xs font-medium group-hover:text-white">{c.name}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <button onClick={() => setClarifyData(null)} className="p-2 rounded-xl bg-white/5 text-zinc-400 hover:text-white flex-shrink-0">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+              )}
 
-              <div className="space-y-6">
-                {/* Category Selection */}
-                {clarifyData.needCategory && clarifyData.parsed.type !== 'transfer' && !clarifyData.resolvedCategoryId && (
-                  <div>
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 block">
-                      📂 Select Category
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {categories.filter(c => c.type === clarifyData.parsed.type).map(c => (
-                        <button
-                          key={c.id}
-                          onClick={() => handleClarifyConfirm({ resolvedCategoryId: c.id })}
-                          className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-emerald-500/30 transition-all text-left group"
-                        >
-                          <span className="w-2 h-2 rounded-full bg-emerald-500/50 group-hover:bg-emerald-500" />
-                          <span className="text-zinc-300 text-xs font-medium group-hover:text-white">{c.name}</span>
-                        </button>
-                      ))}
-                    </div>
+              {clarifyData.needFrom && !clarifyData.resolvedFromId && (
+                <div>
+                  <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-3 block">
+                    {clarifyData.parsed.type === 'income' ? 'Select To Account' : 'Select From Account'}
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {accounts.map(a => (
+                      <button
+                        key={a.id}
+                        onClick={() => handleClarifyConfirm({ resolvedFromId: a.id })}
+                        className="flex flex-col gap-0.5 px-4 py-3 rounded-xl bg-white/5 border border-[var(--border-1)] hover:bg-white/10 hover:border-[var(--accent)]/30 transition-all text-left group"
+                      >
+                        <span className="text-[var(--text-secondary)] text-xs font-bold group-hover:text-white">{a.name}</span>
+                        <span className="text-[10px] text-[var(--text-tertiary)]">{formatCurrency(a.balance)}</span>
+                      </button>
+                    ))}
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* From Account Selection */}
-                {clarifyData.needFrom && !clarifyData.resolvedFromId && (
-                  <div>
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 block">
-                      {clarifyData.parsed.type === 'income' ? '🏦 Select To Account' : '🏦 Select From Account'}
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {accounts.map(a => (
-                        <button
-                          key={a.id}
-                          onClick={() => handleClarifyConfirm({ resolvedFromId: a.id })}
-                          className="flex flex-col gap-0.5 px-4 py-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-emerald-500/30 transition-all text-left group"
-                        >
-                          <span className="text-zinc-300 text-xs font-bold group-hover:text-white">{a.name}</span>
-                          <span className="text-[10px] text-zinc-500">{formatCurrency(a.balance)}</span>
-                        </button>
-                      ))}
-                    </div>
+              {clarifyData.needTo && !clarifyData.resolvedToId && (
+                <div>
+                  <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-3 block">
+                    {clarifyData.parsed.type === 'transfer' ? 'Select To Account' : 'Select Account'}
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {accounts.map(a => (
+                      <button
+                        key={a.id}
+                        onClick={() => handleClarifyConfirm({ resolvedToId: a.id })}
+                        disabled={a.id === clarifyData.resolvedFromId}
+                        className="flex flex-col gap-0.5 px-4 py-3 rounded-xl bg-white/5 border border-[var(--border-1)] hover:bg-white/10 hover:border-[var(--accent)]/30 transition-all text-left group disabled:opacity-20 disabled:pointer-events-none"
+                      >
+                        <span className="text-[var(--text-secondary)] text-xs font-bold group-hover:text-white">{a.name}</span>
+                        <span className="text-[10px] text-[var(--text-tertiary)]">{formatCurrency(a.balance)}</span>
+                      </button>
+                    ))}
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* To Account Selection (transfers only) */}
-                {clarifyData.needTo && !clarifyData.resolvedToId && (
-                  <div>
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 block">
-                      {clarifyData.parsed.type === 'transfer' ? '➡️ Select To Account' : '🏦 Select Account'}
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {accounts.map(a => (
-                        <button
-                          key={a.id}
-                          onClick={() => handleClarifyConfirm({ resolvedToId: a.id })}
-                          disabled={a.id === clarifyData.resolvedFromId}
-                          className="flex flex-col gap-0.5 px-4 py-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-emerald-500/30 transition-all text-left group disabled:opacity-20 disabled:pointer-events-none"
-                        >
-                          <span className="text-zinc-300 text-xs font-bold group-hover:text-white">{a.name}</span>
-                          <span className="text-[10px] text-zinc-500">{formatCurrency(a.balance)}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+              {((clarifyData.needCategory && clarifyData.resolvedCategoryId) ||
+                (clarifyData.needFrom && clarifyData.resolvedFromId) ||
+                (clarifyData.needTo && clarifyData.resolvedToId)) && (
+                  <Button onClick={() => handleClarifyConfirm({})} disabled={saving} className="w-full">
+                    {saving ? 'Saving…' : 'Confirm & Save'}
+                  </Button>
                 )}
-
-                {/* Fallback Confirm Button (only if everything is somehow already set but it still needs confirmation) */}
-                {((clarifyData.needCategory && clarifyData.resolvedCategoryId) ||
-                  (clarifyData.needFrom && clarifyData.resolvedFromId) ||
-                  (clarifyData.needTo && clarifyData.resolvedToId)) && (
-                    <button
-                      onClick={() => handleClarifyConfirm({})}
-                      disabled={saving}
-                      className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white font-bold rounded-2xl text-base transition-all shadow-lg shadow-emerald-500/20 mt-2"
-                    >
-                      {saving ? 'Saving…' : 'Confirm & Save'}
-                    </button>
-                  )}
-              </div>
-            </motion.div>
+            </div>
           </>
         )}
-      </AnimatePresence>
+      </Modal>
     </div>
   );
 }

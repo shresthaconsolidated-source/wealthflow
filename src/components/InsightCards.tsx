@@ -1,8 +1,9 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, AlertTriangle, Info } from 'lucide-react';
+import { TrendingUp, AlertTriangle, Info } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import type { Insight } from '@/src/lib/insightsEngine';
 import { motion } from 'motion/react';
+import { EmptyState } from '@/src/components/ui';
 
 interface Props {
     insights: Insight[];
@@ -11,20 +12,20 @@ interface Props {
 
 const CONFIG = {
     positive: {
-        border: 'border-emerald-500/20',
-        bg: 'bg-emerald-500/5',
+        border: 'border-[var(--accent)]/20',
+        bg: 'bg-[var(--accent-soft)]',
         icon: TrendingUp,
-        iconColor: 'text-emerald-400',
-        iconBg: 'bg-emerald-500/15',
-        badge: 'bg-emerald-500/15 text-emerald-400',
+        iconColor: 'text-[var(--accent)]',
+        iconBg: 'bg-[var(--accent)]/15',
+        badge: 'bg-[var(--accent)]/15 text-[var(--accent)]',
     },
     warning: {
-        border: 'border-amber-500/20',
-        bg: 'bg-amber-500/5',
+        border: 'border-[var(--gold)]/20',
+        bg: 'bg-[var(--gold-soft)]',
         icon: AlertTriangle,
-        iconColor: 'text-amber-400',
-        iconBg: 'bg-amber-500/15',
-        badge: 'bg-amber-500/15 text-amber-400',
+        iconColor: 'text-[var(--gold)]',
+        iconBg: 'bg-[var(--gold)]/15',
+        badge: 'bg-[var(--gold)]/15 text-[var(--gold)]',
     },
     info: {
         border: 'border-blue-500/20',
@@ -38,10 +39,7 @@ const CONFIG = {
 
 export default function InsightCards({ insights, maxShow = 6 }: Props) {
     if (!insights.length) return (
-        <div className="text-center py-12 text-zinc-600">
-            <Info className="w-8 h-8 mx-auto mb-3 opacity-50" />
-            <p className="text-sm">Add more transactions to generate insights.</p>
-        </div>
+        <EmptyState icon={Info} title="Add more transactions to generate insights." />
     );
 
     return (
@@ -54,26 +52,26 @@ export default function InsightCards({ insights, maxShow = 6 }: Props) {
                         key={insight.id}
                         initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.07 }}
+                        transition={{ delay: i * 0.06, ease: [0.16, 1, 0.3, 1] }}
                         className={cn(
-                            "p-5 rounded-[24px] border relative overflow-hidden group transition-all hover:scale-[1.01]",
+                            "p-5 rounded-[24px] border relative overflow-hidden group transition-all duration-300 hover:-translate-y-0.5",
                             cfg.bg, cfg.border
                         )}
                     >
                         <div className="flex items-start gap-4">
-                            <div className={cn("p-2.5 rounded-xl flex-shrink-0", cfg.iconBg)}>
+                            <div className={cn("p-2.5 rounded-xl shrink-0", cfg.iconBg)}>
                                 <Icon className={cn("w-4 h-4", cfg.iconColor)} />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-2 mb-1">
-                                    <h4 className="text-white font-bold text-sm leading-tight">{insight.title}</h4>
+                                    <h4 className="text-[var(--text-primary)] font-bold text-sm leading-tight">{insight.title}</h4>
                                     {insight.metric && (
-                                        <span className={cn("text-xs font-black px-2 py-0.5 rounded-lg flex-shrink-0", cfg.badge)}>
+                                        <span className={cn("tnum text-xs font-bold px-2 py-0.5 rounded-lg shrink-0", cfg.badge)}>
                                             {insight.metric}
                                         </span>
                                     )}
                                 </div>
-                                <p className="text-zinc-400 text-xs leading-relaxed">{insight.body}</p>
+                                <p className="text-[var(--text-tertiary)] text-xs leading-relaxed">{insight.body}</p>
                             </div>
                         </div>
                     </motion.div>

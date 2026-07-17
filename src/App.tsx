@@ -68,15 +68,15 @@ export default function App() {
   return (
     <GoogleOAuthProvider clientId={clientId}>
       {loading ? (
-        <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center">
-          <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+        <div className="min-h-screen bg-[var(--surface-0)] flex items-center justify-center">
+          <div className="w-10 h-10 border-[3px] border-[var(--accent-soft)] border-t-[var(--accent)] rounded-full animate-spin"></div>
         </div>
       ) : !user ? (
         <LandingPage onLoginSuccess={(credential) => login(credential)} />
       ) : (
-        <div className="min-h-screen bg-[#0A0A0B] text-zinc-100 flex flex-col lg:flex-row">
+        <div className="min-h-screen bg-[var(--surface-0)] text-[var(--text-primary)] flex flex-col lg:flex-row">
           <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-          <MobileHeader />
+          <MobileHeader setActiveTab={setActiveTab} />
 
           <main className="flex-1 lg:ml-64 min-h-screen pb-24 lg:pb-0">
             <AnimatePresence mode="wait">
@@ -85,7 +85,7 @@ export default function App() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                 className="p-4 lg:p-8"
               >
                 {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}

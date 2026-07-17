@@ -1,22 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  TrendingUp, 
-  Flame, 
-  ChevronRight, 
-  Settings2, 
-  Zap, 
-  ShieldCheck,
+import {
+  TrendingUp,
+  Flame,
+  Settings2,
+  Zap,
   Activity,
   ArrowRightLeft,
   Plus,
   Trash2,
-  ChevronDown,
-  ChevronUp,
-  DollarSign
 } from 'lucide-react';
 import { formatCurrency, cn, getCurrencySymbol } from '@/src/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApi } from '@/src/hooks/useApi';
+import { Card, Button } from '@/src/components/ui';
 
 interface BulkEvent {
   id: string;
@@ -31,35 +27,37 @@ interface Props {
   accounts: any[];
 }
 
+const fieldClasses = "w-full bg-white/5 border border-[var(--border-2)] rounded-2xl px-5 py-4 text-[var(--text-primary)] font-bold focus:outline-none transition-all";
+
 export default function FirePath({ history, accounts }: Props) {
   const { fetchWithAuth } = useApi();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<number | null>(null);
   const [baseCurrency, setBaseCurrency] = useState('USD');
-  
+
   // Settings
   const [inflation, setInflation] = useState(5.0);
   const [years, setYears] = useState(20);
   const [manualInvestment, setManualInvestment] = useState<number | null>(null);
   const [manualReturn, setManualReturn] = useState<number | null>(null);
   const [plannedExpenses, setPlannedExpenses] = useState<number | null>(null);
-  const [stepUp, setStepUp] = useState(0); 
+  const [stepUp, setStepUp] = useState(0);
   const [manualStartingCapital, setManualStartingCapital] = useState<number | null>(null);
   const [bulkEvents, setBulkEvents] = useState<BulkEvent[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Derived from history & accounts
   const currentNetWorth = accounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
-  const avgMonthlySavings = history.length > 0 
+  const avgMonthlySavings = history.length > 0
     ? history.reduce((sum, h) => sum + (h.savings || 0), 0) / history.length
     : 0;
-  
+
   const avgExpenses = history.length > 0
     ? history.reduce((sum, h) => sum + (h.expense || 0), 0) / history.length
     : 30000;
 
-  const historicalReturn = 12.0; 
+  const historicalReturn = 12.0;
 
   const effectiveInvestment = manualInvestment !== null ? manualInvestment : avgMonthlySavings;
   const effectiveReturn = manualReturn !== null ? manualReturn : historicalReturn;
@@ -143,7 +141,7 @@ export default function FirePath({ history, accounts }: Props) {
   const safeWithdrawalPct = Math.max(0, effectiveReturn - inflation);
   const safeMonthlyWithdrawalReal = (futureValueReal * (safeWithdrawalPct / 100)) / 12;
   const targetNetWorthReal = (effectiveExpenses * 12) / (Math.max(0.5, safeWithdrawalPct) / 100);
-  
+
   let yearsToRetire = 0;
   if (effectiveInvestment > 0 || effectiveReturn > inflation || bulkEvents.some(e => e.type === 'income')) {
     let simNominal = effectiveStartingCapital;
@@ -189,10 +187,10 @@ export default function FirePath({ history, accounts }: Props) {
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center py-20 animate-pulse">
-        <div className="w-12 h-12 bg-orange-500/20 rounded-full flex items-center justify-center mb-4">
-            <Flame className="w-6 h-6 text-orange-500 opacity-50" />
+        <div className="w-12 h-12 bg-orange-500/15 rounded-full flex items-center justify-center mb-4">
+            <Flame className="w-6 h-6 text-orange-400 opacity-60" />
         </div>
-        <p className="text-zinc-500 font-bold tracking-widest text-xs uppercase">Simulating Paths...</p>
+        <p className="text-[var(--text-tertiary)] font-bold tracking-widest text-xs uppercase">Simulating Paths...</p>
     </div>
   );
 
@@ -202,28 +200,28 @@ export default function FirePath({ history, accounts }: Props) {
       <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center">
-              <Flame className="w-6 h-6 text-orange-500" />
+              <Flame className="w-6 h-6 text-orange-400" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-white tracking-tight">FIRE Path Projections</h2>
+              <h2 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">FIRE Path Projections</h2>
               <div className="flex items-center gap-2">
-                <p className="text-zinc-500 text-sm">Fine-tune your journey to financial freedom.</p>
+                <p className="text-[var(--text-tertiary)] text-sm">Fine-tune your journey to financial freedom.</p>
                 <AnimatePresence>
                   {saving && (
-                    <motion.span 
+                    <motion.span
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
-                      className="text-[10px] font-bold text-orange-500 animate-pulse uppercase tracking-widest bg-orange-500/10 px-2 py-0.5 rounded-md"
+                      className="text-[10px] font-bold text-orange-400 uppercase tracking-widest bg-orange-500/10 px-2 py-0.5 rounded-md"
                     >
                       Saving...
                     </motion.span>
                   )}
                   {!saving && lastSaved && (
-                    <motion.span 
+                    <motion.span
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest bg-emerald-500/10 px-2 py-0.5 rounded-md"
+                      className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-widest bg-[var(--accent-soft)] px-2 py-0.5 rounded-md"
                     >
                       Saved
                     </motion.span>
@@ -236,65 +234,59 @@ export default function FirePath({ history, accounts }: Props) {
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
-        
+
         {/* Input Sidebar */}
         <div className="xl:col-span-2 space-y-6">
-          <div className="bg-[#151518]/50 border border-white/5 rounded-[40px] p-8 lg:p-10 space-y-10 backdrop-blur-xl">
-            
+          <Card level={1} padding="lg" className="rounded-[40px] space-y-10">
+
             {/* Step 1: Starting Point */}
             <div className="space-y-6">
                 <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center text-[10px] font-black">1</span>
-                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Starting Point</h3>
+                    <span className="w-6 h-6 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] flex items-center justify-center text-[10px] font-bold">1</span>
+                    <h3 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Starting Point</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4 p-6 bg-white/5 rounded-3xl border border-white/5">
+                    <div className="space-y-4 p-6 bg-white/5 rounded-3xl border border-[var(--border-1)]">
                         <div className="flex justify-between items-center">
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Starting capital</label>
-                            <button 
+                            <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest">Starting capital</label>
+                            <button
                                 onClick={() => setManualStartingCapital(manualStartingCapital === null ? currentNetWorth : null)}
-                                className="text-[10px] font-bold text-emerald-500 hover:text-emerald-400 uppercase tracking-widest transition-colors"
+                                className="text-[10px] font-bold text-[var(--accent)] hover:text-[var(--accent-strong)] uppercase tracking-widest transition-colors"
                             >
                                 {manualStartingCapital === null ? 'Override' : 'Live'}
                             </button>
                         </div>
                         <div className="relative group">
-                            <input 
+                            <input
                                 type="number"
                                 value={manualStartingCapital !== null ? manualStartingCapital : currentNetWorth.toFixed(0)}
                                 onChange={(e) => setManualStartingCapital(Number(e.target.value))}
                                 disabled={manualStartingCapital === null}
-                                className={cn(
-                                    "w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold focus:outline-none transition-all",
-                                    manualStartingCapital === null ? "opacity-50 cursor-not-allowed" : "focus:ring-2 focus:ring-emerald-500/50"
-                                )}
+                                className={cn(fieldClasses, manualStartingCapital === null ? "opacity-50 cursor-not-allowed" : "focus:ring-2 focus:ring-[var(--accent-ring)]")}
                             />
-                            <span className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">{getCurrencySymbol(baseCurrency)}</span>
+                            <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold">{getCurrencySymbol(baseCurrency)}</span>
                         </div>
                     </div>
 
-                    <div className="space-y-4 p-6 bg-white/5 rounded-3xl border border-white/5">
+                    <div className="space-y-4 p-6 bg-white/5 rounded-3xl border border-[var(--border-1)]">
                         <div className="flex justify-between items-center">
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Investment (Monthly)</label>
-                            <button 
+                            <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest">Investment (Monthly)</label>
+                            <button
                                 onClick={() => setManualInvestment(manualInvestment === null ? Math.round(avgMonthlySavings) : null)}
-                                className="text-[10px] font-bold text-emerald-500 hover:text-emerald-400 uppercase tracking-widest transition-colors"
+                                className="text-[10px] font-bold text-[var(--accent)] hover:text-[var(--accent-strong)] uppercase tracking-widest transition-colors"
                             >
                                 {manualInvestment === null ? 'Override' : 'History'}
                             </button>
                         </div>
                         <div className="relative group">
-                            <input 
+                            <input
                                 type="number"
                                 value={manualInvestment !== null ? manualInvestment : Math.round(avgMonthlySavings)}
                                 onChange={(e) => setManualInvestment(Number(e.target.value))}
                                 disabled={manualInvestment === null}
-                                className={cn(
-                                    "w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold focus:outline-none transition-all",
-                                    manualInvestment === null ? "opacity-50 cursor-not-allowed" : "focus:ring-2 focus:ring-emerald-500/50"
-                                )}
+                                className={cn(fieldClasses, manualInvestment === null ? "opacity-50 cursor-not-allowed" : "focus:ring-2 focus:ring-[var(--accent-ring)]")}
                             />
-                            <span className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">{getCurrencySymbol(baseCurrency)}</span>
+                            <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold">{getCurrencySymbol(baseCurrency)}</span>
                         </div>
                     </div>
                 </div>
@@ -303,85 +295,85 @@ export default function FirePath({ history, accounts }: Props) {
             {/* Step 2: The Targets */}
             <div className="space-y-6">
                 <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center text-[10px] font-black">2</span>
-                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Targets & Assumptions</h3>
+                    <span className="w-6 h-6 rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center text-[10px] font-bold">2</span>
+                    <h3 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Targets & Assumptions</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-3">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex justify-between">
+                        <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest flex justify-between">
                             Planned Exp.
-                            <button onClick={() => setPlannedExpenses(plannedExpenses === null ? Math.round(avgExpenses) : null)} className="text-emerald-500">
+                            <button onClick={() => setPlannedExpenses(plannedExpenses === null ? Math.round(avgExpenses) : null)} className="text-[var(--accent)]">
                                 {plannedExpenses === null ? 'Edit' : 'Reset'}
                             </button>
                         </label>
-                        <input 
+                        <input
                             type="number"
                             value={plannedExpenses !== null ? plannedExpenses : Math.round(avgExpenses)}
                             onChange={(e) => setPlannedExpenses(Number(e.target.value))}
                             disabled={plannedExpenses === null}
-                            className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold focus:ring-2 focus:ring-orange-500/50 outline-none transition-all disabled:opacity-50"
+                            className={cn(fieldClasses, "focus:ring-2 focus:ring-orange-500/40 disabled:opacity-50")}
                         />
                     </div>
                     <div className="space-y-3">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex justify-between">
+                        <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest flex justify-between">
                             Expected Return
-                            <button onClick={() => setManualReturn(manualReturn === null ? 12 : null)} className="text-emerald-500">
+                            <button onClick={() => setManualReturn(manualReturn === null ? 12 : null)} className="text-[var(--accent)]">
                                 {manualReturn === null ? 'Edit' : 'Reset'}
                             </button>
                         </label>
                         <div className="relative">
-                            <input 
+                            <input
                                 type="number" step="0.1"
                                 value={manualReturn !== null ? manualReturn : historicalReturn}
                                 onChange={(e) => setManualReturn(Number(e.target.value))}
                                 disabled={manualReturn === null}
-                                className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold outline-none transition-all disabled:opacity-50"
+                                className={cn(fieldClasses, "disabled:opacity-50")}
                             />
-                            <span className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">%</span>
+                            <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold">%</span>
                         </div>
                     </div>
                     <div className="space-y-3">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Est. Inflation</label>
+                        <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest">Est. Inflation</label>
                         <div className="relative">
-                            <input 
+                            <input
                                 type="number" step="0.1"
                                 value={inflation}
                                 onChange={(e) => setInflation(Number(e.target.value))}
-                                className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white font-bold focus:ring-2 focus:ring-white/10 outline-none"
+                                className={cn(fieldClasses, "focus:ring-2 focus:ring-white/10")}
                             />
-                            <span className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">%</span>
+                            <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-bold">%</span>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Advanced & Timeline Toggle */}
-            <div className="pt-6 border-t border-white/5 flex flex-wrap gap-4 items-center justify-between">
+            <div className="pt-6 border-t border-[var(--border-1)] flex flex-wrap gap-4 items-center justify-between">
                 <div className="flex gap-4">
                     <div className="space-y-2">
-                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Years</span>
-                        <select 
-                            value={years} 
+                        <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest block">Years</span>
+                        <select
+                            value={years}
                             onChange={(e) => setYears(Number(e.target.value))}
-                            className="bg-[#1c1c20] border border-white/10 rounded-xl px-4 py-2 text-white font-bold outline-none"
+                            className="bg-[var(--surface-2)] border border-[var(--border-2)] rounded-xl px-4 py-2 text-[var(--text-primary)] font-bold outline-none"
                         >
                             {[5,10,15,20,25,30].map(y => <option key={y} value={y}>{y} Years</option>)}
                         </select>
                     </div>
                     <div className="space-y-2">
-                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Step-up %</span>
-                        <input 
+                        <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest block">Step-up %</span>
+                        <input
                             type="number"
                             value={stepUp}
                             onChange={(e) => setStepUp(Number(e.target.value))}
-                            className="w-20 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white font-bold outline-none"
+                            className="w-20 bg-white/5 border border-[var(--border-2)] rounded-xl px-4 py-2 text-[var(--text-primary)] font-bold outline-none"
                         />
                     </div>
                 </div>
-                
-                <button 
+
+                <button
                     onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all text-zinc-300 font-bold text-sm"
+                    className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-[var(--border-2)] rounded-2xl hover:bg-white/10 transition-all text-[var(--text-secondary)] font-bold text-sm active:scale-95"
                 >
                     <Settings2 className={cn("w-4 h-4 transition-transform", showAdvanced && "rotate-180")} />
                     Advanced Options
@@ -391,7 +383,7 @@ export default function FirePath({ history, accounts }: Props) {
             {/* Advanced Panel */}
             <AnimatePresence>
                 {showAdvanced && (
-                    <motion.div 
+                    <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
@@ -399,66 +391,63 @@ export default function FirePath({ history, accounts }: Props) {
                     >
                         <div className="pt-8 space-y-6">
                             <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-bold text-white uppercase tracking-widest">Bulk One-Time Events</h4>
-                                <button 
-                                    onClick={addBulkEvent}
-                                    className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-500 rounded-xl hover:bg-emerald-500/20 transition-all text-xs font-bold"
-                                >
+                                <h4 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-widest">Bulk One-Time Events</h4>
+                                <Button variant="ghost" size="sm" onClick={addBulkEvent} className="bg-[var(--accent-soft)] text-[var(--accent)]">
                                     <Plus className="w-3 h-3" /> Add Event
-                                </button>
+                                </Button>
                             </div>
-                            
+
                             <div className="space-y-3">
                                 {bulkEvents.length === 0 && (
-                                    <div className="py-8 text-center border-2 border-dashed border-white/5 rounded-3xl">
-                                        <p className="text-zinc-600 text-xs italic">No bulk events added yet (e.g. Marriage, House Sale)</p>
+                                    <div className="py-8 text-center border-2 border-dashed border-[var(--border-1)] rounded-3xl">
+                                        <p className="text-[var(--text-tertiary)] text-xs italic">No bulk events added yet (e.g. Marriage, House Sale)</p>
                                     </div>
                                 )}
                                 {bulkEvents.map((event) => (
-                                    <div key={event.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-white/5 rounded-2xl border border-white/5 items-center">
+                                    <div key={event.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-white/5 rounded-2xl border border-[var(--border-1)] items-center">
                                         <div className="md:col-span-2">
-                                            <select 
+                                            <select
                                                 value={event.type}
                                                 onChange={(e) => updateBulkEvent(event.id, { type: e.target.value as any })}
-                                                className="w-full bg-[#1c1c20] border border-white/10 rounded-xl px-3 py-2 text-white text-xs font-bold"
+                                                className="w-full bg-[var(--surface-2)] border border-[var(--border-2)] rounded-xl px-3 py-2 text-[var(--text-primary)] text-xs font-bold"
                                             >
                                                 <option value="income">Income</option>
                                                 <option value="expense">Expense</option>
                                             </select>
                                         </div>
                                         <div className="md:col-span-3 relative">
-                                            <input 
+                                            <input
                                                 type="number"
                                                 value={event.amount}
                                                 onChange={(e) => updateBulkEvent(event.id, { amount: Number(e.target.value) })}
-                                                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-xs font-bold"
+                                                className="w-full bg-white/5 border border-[var(--border-2)] rounded-xl px-3 py-2 text-[var(--text-primary)] text-xs font-bold"
                                                 placeholder="Amount"
                                             />
                                         </div>
                                         <div className="md:col-span-2 space-y-1">
-                                            <label className="text-[10px] text-zinc-500 font-bold uppercase block ml-1">Year</label>
-                                            <input 
+                                            <label className="text-[10px] text-[var(--text-tertiary)] font-bold uppercase block ml-1">Year</label>
+                                            <input
                                                 type="number"
                                                 min="1"
                                                 max={years}
                                                 value={event.year}
                                                 onChange={(e) => updateBulkEvent(event.id, { year: Number(e.target.value) })}
-                                                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-xs font-bold"
+                                                className="w-full bg-white/5 border border-[var(--border-2)] rounded-xl px-3 py-2 text-[var(--text-primary)] text-xs font-bold"
                                             />
                                         </div>
                                         <div className="md:col-span-4">
-                                            <input 
+                                            <input
                                                 type="text"
                                                 value={event.note}
                                                 onChange={(e) => updateBulkEvent(event.id, { note: e.target.value })}
-                                                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-xs font-bold"
+                                                className="w-full bg-white/5 border border-[var(--border-2)] rounded-xl px-3 py-2 text-[var(--text-primary)] text-xs font-bold"
                                                 placeholder="Note (e.g. Sale of land)"
                                             />
                                         </div>
                                         <div className="md:col-span-1 flex justify-end">
-                                            <button 
+                                            <button
                                                 onClick={() => removeBulkEvent(event.id)}
-                                                className="p-2 text-zinc-600 hover:text-red-500 transition-colors"
+                                                className="p-2 text-[var(--text-tertiary)] hover:text-[var(--danger)] transition-colors"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
@@ -470,98 +459,98 @@ export default function FirePath({ history, accounts }: Props) {
                     </motion.div>
                 )}
             </AnimatePresence>
-          </div>
+          </Card>
         </div>
 
         {/* Results Sidebar */}
         <div className="space-y-6">
             {/* Main Result */}
-            <div className="bg-gradient-to-br from-emerald-600/20 to-teal-600/20 border border-emerald-500/20 rounded-[40px] p-8 space-y-8 relative overflow-hidden group">
-                <div className="absolute -top-12 -right-12 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                    <Zap className="w-48 h-48 text-emerald-400 rotate-12" />
+            <div className="bg-gradient-to-br from-[var(--accent)]/15 to-teal-600/10 border border-[var(--accent)]/20 rounded-[40px] p-8 space-y-8 relative overflow-hidden group">
+                <div className="absolute -top-12 -right-12 p-8 opacity-[0.06] group-hover:opacity-10 transition-opacity">
+                    <Zap className="w-48 h-48 text-[var(--accent)] rotate-12" />
                 </div>
                 <div className="space-y-6 relative z-10">
                     <div className="flex items-center gap-3">
-                        <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-400">
+                        <div className="p-3 rounded-2xl bg-[var(--accent)]/20 text-[var(--accent)]">
                             <Zap className="w-6 h-6" />
                         </div>
-                        <span className="text-emerald-400 text-xs font-black uppercase tracking-widest">Path to Freedom</span>
+                        <span className="text-[var(--accent)] text-xs font-bold uppercase tracking-widest">Path to Freedom</span>
                     </div>
-                    <h3 className="text-4xl font-black text-white leading-tight">
+                    <h3 className="text-4xl font-bold text-[var(--text-primary)] leading-tight">
                         {yearsToRetire <= 0 ? "Retire Today" : `Retire in ${yearsToRetire.toFixed(1)} years`}
                     </h3>
-                    <p className="text-emerald-200/60 text-sm leading-relaxed">
+                    <p className="text-[var(--text-secondary)] text-sm leading-relaxed">
                         Reaching {formatCurrency(targetNetWorthReal, baseCurrency)} in today's money will cover your {formatCurrency(effectiveExpenses, baseCurrency)} monthly spend forever.
                     </p>
                 </div>
-                
-                <div className="pt-8 border-t border-emerald-500/20 flex flex-col gap-4">
+
+                <div className="pt-8 border-t border-[var(--accent)]/20 flex flex-col gap-4 relative z-10">
                     <div className="flex justify-between items-center text-xs">
-                    <span className="text-emerald-300/60 font-bold uppercase tracking-widest">Monthly Target</span>
-                    <span className="text-white font-bold">{formatCurrency(effectiveInvestment, baseCurrency)} /mo</span>
+                    <span className="text-[var(--text-secondary)] font-bold uppercase tracking-widest">Monthly Target</span>
+                    <span className="tnum text-[var(--text-primary)] font-bold">{formatCurrency(effectiveInvestment, baseCurrency)} /mo</span>
                 </div>
                    <div className="flex justify-between items-center text-xs">
-                        <span className="text-emerald-300/60 font-bold uppercase tracking-widest">Annual Step-up</span>
-                        <span className="text-white font-bold">+{stepUp}%</span>
+                        <span className="text-[var(--text-secondary)] font-bold uppercase tracking-widest">Annual Step-up</span>
+                        <span className="text-[var(--text-primary)] font-bold">+{stepUp}%</span>
                     </div>
                 </div>
             </div>
 
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-1 gap-4">
-                <div className="bg-[#151518] border border-white/5 rounded-3xl p-6 space-y-4">
+                <Card level={1} padding="none" className="p-6 space-y-4">
                     <div className="flex justify-between items-start">
-                        <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Wealth in {years}y</p>
-                        <TrendingUp className="w-4 h-4 text-emerald-500" />
+                        <p className="text-[var(--text-tertiary)] text-[10px] font-bold uppercase tracking-widest">Wealth in {years}y</p>
+                        <TrendingUp className="w-4 h-4 text-[var(--accent)]" />
                     </div>
                     <div>
-                        <h4 className="text-xl font-bold text-white tracking-tight">{formatCurrency(futureValueReal)}</h4>
-                        <p className="text-zinc-600 text-[9px] uppercase tracking-wider mt-1">Today's Value terms</p>
+                        <h4 className="tnum text-xl font-bold text-[var(--text-primary)] tracking-tight">{formatCurrency(futureValueReal)}</h4>
+                        <p className="text-[var(--text-tertiary)] text-[9px] uppercase tracking-wider mt-1">Today's Value terms</p>
                     </div>
-                </div>
+                </Card>
 
-                <div className="bg-[#151518] border border-white/5 rounded-3xl p-6 space-y-4">
+                <Card level={1} padding="none" className="p-6 space-y-4">
                     <div className="flex justify-between items-start">
-                        <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Passive Income</p>
-                        <Activity className="w-4 h-4 text-blue-500" />
+                        <p className="text-[var(--text-tertiary)] text-[10px] font-bold uppercase tracking-widest">Passive Income</p>
+                        <Activity className="w-4 h-4 text-blue-400" />
                     </div>
                     <div>
-                        <h4 className="text-xl font-bold text-white tracking-tight">{formatCurrency(monthlyPassiveReal)}</h4>
-                        <p className="text-zinc-600 text-[9px] uppercase tracking-wider mt-1">Inflation Adjusted /mo</p>
+                        <h4 className="tnum text-xl font-bold text-[var(--text-primary)] tracking-tight">{formatCurrency(monthlyPassiveReal)}</h4>
+                        <p className="text-[var(--text-tertiary)] text-[9px] uppercase tracking-wider mt-1">Inflation Adjusted /mo</p>
                     </div>
-                </div>
+                </Card>
             </div>
         </div>
       </div>
 
       {/* Sustainability & Rule of Thumb */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-[#151518]/50 border border-white/5 rounded-[32px] p-8 space-y-6">
-            <h3 className="text-lg font-bold text-white flex items-center gap-3">
-                <Settings2 className="w-5 h-5 text-zinc-400" />
+        <Card level={1} padding="lg" className="space-y-6">
+            <h3 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-3">
+                <Settings2 className="w-5 h-5 text-[var(--text-secondary)]" />
                 Sustainability Logic
             </h3>
             <div className="bg-white/5 rounded-2xl p-6 flex items-center justify-between">
                 <div>
-                    <p className="text-zinc-400 text-xs font-bold uppercase tracking-wider mb-1">Sustainable Yield</p>
-                    <p className="text-white font-bold text-xl">{safeWithdrawalPct.toFixed(1)}% / Year</p>
+                    <p className="text-[var(--text-secondary)] text-xs font-bold uppercase tracking-wider mb-1">Sustainable Yield</p>
+                    <p className="tnum text-[var(--text-primary)] font-bold text-xl">{safeWithdrawalPct.toFixed(1)}% / Year</p>
                 </div>
-                <ArrowRightLeft className="w-8 h-8 text-zinc-600" />
+                <ArrowRightLeft className="w-8 h-8 text-[var(--text-tertiary)]" />
                 <div className="text-right">
-                    <p className="text-zinc-400 text-xs font-bold uppercase tracking-wider mb-1">Monthly Safe Spend</p>
-                    <p className="text-emerald-400 font-black text-xl">{formatCurrency(safeMonthlyWithdrawalReal)}</p>
+                    <p className="text-[var(--text-secondary)] text-xs font-bold uppercase tracking-wider mb-1">Monthly Safe Spend</p>
+                    <p className="tnum text-[var(--accent)] font-bold text-xl">{formatCurrency(safeMonthlyWithdrawalReal)}</p>
                 </div>
             </div>
-            <p className="text-zinc-500 text-xs leading-relaxed italic">
+            <p className="text-[var(--text-tertiary)] text-xs leading-relaxed italic">
                 By withdrawing only {safeWithdrawalPct.toFixed(1)}% annually, your corpus keeps up with {inflation}% inflation indefinitely.
             </p>
-        </div>
+        </Card>
 
-        <div className="bg-orange-500/5 border border-orange-500/10 rounded-[32px] p-8 flex flex-col justify-center text-center space-y-3">
-            <h3 className="text-orange-400 font-black text-xl tracking-tight italic">Rule of Thumb</h3>
-            <p className="text-zinc-300 text-sm leading-relaxed max-w-sm mx-auto">
-                If your target monthly spend is {formatCurrency(effectiveExpenses)}, you need a retirement corpus of 
-                <span className="text-white font-black block text-3xl mt-2 tracking-tighter">{formatCurrency(targetNetWorthReal)}</span>
+        <div className="bg-orange-500/5 border border-orange-500/15 rounded-[32px] p-8 flex flex-col justify-center text-center space-y-3">
+            <h3 className="text-orange-400 font-bold text-xl tracking-tight">Rule of Thumb</h3>
+            <p className="text-[var(--text-secondary)] text-sm leading-relaxed max-w-sm mx-auto">
+                If your target monthly spend is {formatCurrency(effectiveExpenses)}, you need a retirement corpus of
+                <span className="tnum text-[var(--text-primary)] font-bold block text-3xl mt-2 tracking-tight">{formatCurrency(targetNetWorthReal)}</span>
                 in today's money to reach absolute financial freedom.
             </p>
         </div>

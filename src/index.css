@@ -4,18 +4,69 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @layer base {
   :root {
     --sat: env(safe-area-inset-top);
     --sar: env(safe-area-inset-right);
     --sab: env(safe-area-inset-bottom);
     --sal: env(safe-area-inset-left);
+
+    /* Surface elevation — each step lifts slightly off the one below it */
+    --surface-0: #08090b;
+    --surface-1: #111318;
+    --surface-2: #191b21;
+    --surface-3: #212329;
+
+    /* Hairline borders — same three levels, always subtle */
+    --border-1: rgba(255, 255, 255, 0.06);
+    --border-2: rgba(255, 255, 255, 0.09);
+    --border-3: rgba(255, 255, 255, 0.14);
+
+    /* Text hierarchy */
+    --text-primary: #f4f4f5;
+    --text-secondary: #a1a1aa;
+    --text-tertiary: #6b6b74;
+
+    /* Brand accent — a single, restrained emerald. No secondary rainbow accents. */
+    --accent: #2ee6a6;
+    --accent-strong: #1fcb90;
+    --accent-soft: rgba(46, 230, 166, 0.12);
+    --accent-ring: rgba(46, 230, 166, 0.35);
+
+    /* Rare premium highlight — used sparingly for FIRE milestones / premium moments only */
+    --gold: #d4b76a;
+    --gold-soft: rgba(212, 183, 106, 0.12);
+
+    /* Signal colors */
+    --danger: #f2554e;
+    --danger-soft: rgba(242, 85, 78, 0.12);
+
+    /* One easing curve, used everywhere motion happens */
+    --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   body {
-    @apply bg-[#0A0A0B] text-zinc-100 antialiased selection:bg-emerald-500/30;
+    background: var(--surface-0);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: none;
+  }
+
+  body {
+    @apply antialiased selection:bg-emerald-400/30;
+  }
+
+  /* Financial figures read better with tabular numerals — digits never jitter in width */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
   }
 }
 
@@ -29,15 +80,47 @@
   .min-h-screen-safe {
     min-height: calc(100vh + env(safe-area-inset-bottom));
   }
-  
-  /* Hide scrollbar for Chrome, Safari and Opera */
+
+  /* Hide scrollbar entirely (nav rails, chip rows) */
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
-
-  /* Hide scrollbar for IE, Edge and Firefox */
   .no-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Slim, unobtrusive scrollbar for panels that do want a visible track */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.22);
+  }
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  }
+
+  /* Subtle grain to keep large flat dark surfaces from looking dead/plasticky */
+  .bg-grain {
+    position: relative;
+  }
+  .bg-grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
   }
 }

@@ -1,41 +1,37 @@
 import React from 'react';
-import { Wallet, User, LogOut } from 'lucide-react';
+import { Wallet, User } from 'lucide-react';
 import { useAuth } from '@/src/contexts/AuthContext';
 
-export default function MobileHeader() {
-  const { user, logout } = useAuth();
+interface MobileHeaderProps {
+  setActiveTab: (tab: string) => void;
+}
+
+export default function MobileHeader({ setActiveTab }: MobileHeaderProps) {
+  const { user } = useAuth();
 
   return (
-    <header className="lg:hidden sticky top-0 z-40 bg-[#0A0A0B]/80 backdrop-blur-xl border-b border-white/5 pt-safe">
-      <div className="flex items-center justify-between h-16 px-6">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-            <Wallet className="text-white w-4 h-4" />
+    <header className="lg:hidden sticky top-0 z-40 bg-[var(--surface-0)]/80 backdrop-blur-xl border-b border-[var(--border-1)] pt-safe">
+      <div className="flex items-center justify-between h-16 px-5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-strong)] flex items-center justify-center shadow-[0_6px_16px_-4px_var(--accent-ring)]">
+            <Wallet className="text-[#04140e] w-4 h-4" strokeWidth={2.5} />
           </div>
-          <span className="text-lg font-bold text-white tracking-tight">WealthFlow</span>
+          <span className="text-base font-bold text-[var(--text-primary)] tracking-tight">WealthFlow</span>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className="flex flex-col items-end">
-              <span className="text-xs font-bold text-white leading-none">{user?.name}</span>
-              <span className="text-[10px] text-zinc-500 font-medium lowercase tracking-wider">{user?.email}</span>
-            </div>
-            <div className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
-              {user?.picture ? (
-                <img src={user.picture} alt={user.name} className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-4 h-4 text-zinc-400" />
-              )}
-            </div>
+        <button
+          onClick={() => setActiveTab('settings')}
+          aria-label="Account settings"
+          className="w-11 h-11 -mr-1.5 flex items-center justify-center active:scale-95 transition-transform"
+        >
+          <div className="w-8 h-8 rounded-full bg-[var(--surface-2)] border border-[var(--border-2)] flex items-center justify-center overflow-hidden">
+            {user?.picture ? (
+              <img src={user.picture} alt={user.name} className="w-full h-full object-cover" />
+            ) : (
+              <User className="w-4 h-4 text-[var(--text-tertiary)]" />
+            )}
           </div>
-          <button
-            onClick={() => logout()}
-            className="p-2 rounded-xl bg-red-400/5 text-red-400 border border-red-400/10 active:scale-95 transition-all"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
+        </button>
       </div>
     </header>
   );

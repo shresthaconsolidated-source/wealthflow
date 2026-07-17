@@ -4,13 +4,10 @@ import {
   TrendingDown,
   DollarSign,
   PieChart as PieChartIcon,
-  ArrowUpRight,
-  ArrowDownRight,
   Plus,
   Wallet,
   CreditCard,
   Briefcase,
-  X,
   ChevronRight
 } from 'lucide-react';
 import {
@@ -28,7 +25,6 @@ import {
   Pie
 } from 'recharts';
 import { formatCurrency, cn, getCurrencySymbol } from '@/src/lib/utils';
-import { motion, AnimatePresence } from 'motion/react';
 import { useApi } from '@/src/hooks/useApi';
 import InsightCards from './InsightCards';
 import HealthScoreCard from './HealthScoreCard';
@@ -36,8 +32,10 @@ import ForecastSection from './ForecastSection';
 import { generateInsights } from '@/src/lib/insightsEngine';
 import { computeForecast } from '@/src/lib/forecastEngine';
 import { computeHealthScore } from '@/src/lib/healthScoreEngine';
+import { Card, Button, StatCard, EmptyState, PageHeader, Modal, Select } from '@/src/components/ui';
+import { DashboardSkeleton } from '@/src/components/ui/Skeleton';
 
-const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
+const COLORS = ['#2ee6a6', '#3b82f6', '#d4b76a', '#f2554e', '#8b5cf6'];
 
 interface DashboardProps {
   setActiveTab: (tab: string) => void;
@@ -100,7 +98,7 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
       .sort((a, b) => b[1].total - a[1].total);
   }, [accounts]);
 
-  if (!data) return <div className="p-8 text-zinc-500">Loading dashboard...</div>;
+  if (!data) return <DashboardSkeleton />;
 
   // Defensive calculations
   const totalNetWorth = Number(data.totalNetWorth || 0);
@@ -114,8 +112,6 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
     { label: 'Monthly Expense', value: monthlyExpense, icon: TrendingDown, trend: 'This Month', positive: monthlyExpense === 0 },
     { label: 'Savings Rate', value: `${savingsRate.toFixed(1)}%`, icon: PieChartIcon, trend: 'This Month', positive: savingsRate >= 0 },
   ];
-
-  const currentMonthLabel = new Date(selectedMonth + '-01').toLocaleString('default', { month: 'short' });
 
   const chartData = (history || []).slice(-chartRange).map((h) => ({
     month: h.label || 'N/A',
@@ -136,76 +132,54 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
   const forecast = (history || []).length >= 2 ? computeForecast(history) : null;
   const healthScore = computeHealthScore(history || [], accounts);
 
+  const selectedGroupData = groupedAccounts.find(([type]) => type === selectedGroup)?.[1];
+
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-12 lg:pb-0">
-      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-6">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">Financial Overview</h1>
-          <p className="text-zinc-500 mt-1 text-sm lg:text-base">Welcome back. Here's what's happening with your wealth.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-          <input
-            type="month"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-sm"
-          />
-          <button
-            onClick={() => setActiveTab('transactions')}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 text-sm"
-          >
-            <Plus className="w-5 h-5" />
-            Add Transaction
-          </button>
-        </div>
-      </div>
+    <div className="space-y-6 lg:space-y-8 max-w-7xl mx-auto pb-12 lg:pb-0">
+      <PageHeader
+        title="Financial Overview"
+        description="Welcome back. Here's what's happening with your wealth."
+        actions={
+          <>
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-[var(--surface-2)] border border-[var(--border-2)] rounded-2xl px-4 py-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)] text-sm"
+            />
+            <Button onClick={() => setActiveTab('transactions')} size="lg">
+              <Plus className="w-5 h-5" />
+              Add Transaction
+            </Button>
+          </>
+        }
+      />
 
       {/* KPIs */}
-      <div className="flex lg:grid lg:grid-cols-4 gap-4 overflow-x-auto lg:overflow-x-visible no-scrollbar -mx-4 px-4 lg:mx-0 lg:px-0 pb-4 lg:pb-0">
+      <div className="flex lg:grid lg:grid-cols-4 gap-4 overflow-x-auto lg:overflow-x-visible no-scrollbar -mx-4 px-4 lg:mx-0 lg:px-0 pb-1 lg:pb-0">
         {kpis.map((kpi, i) => (
-          <motion.div
+          <StatCard
             key={kpi.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            className="min-w-[280px] lg:min-w-0 flex-1 bg-[#151518] border border-white/5 rounded-3xl p-6 relative overflow-hidden group hover:border-emerald-500/30 transition-all shadow-xl"
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 rounded-2xl bg-white/5 text-zinc-400 group-hover:text-emerald-400 transition-colors">
-                <kpi.icon className="w-6 h-6" />
-              </div>
-              <div className={cn(
-                "flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full",
-                kpi.positive ? "bg-emerald-400/10 text-emerald-400" : "bg-red-400/10 text-red-400"
-              )}>
-                {kpi.positive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                {kpi.trend}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">{kpi.label}</p>
-              <h3 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">
-                {typeof kpi.value === 'number' ? formatCurrency(kpi.value) : (kpi.value || '0')}
-              </h3>
-            </div>
-          </motion.div>
+            label={kpi.label}
+            value={typeof kpi.value === 'number' ? formatCurrency(kpi.value) : (kpi.value || '0')}
+            icon={kpi.icon}
+            trend={kpi.trend}
+            positive={kpi.positive}
+            delay={i * 0.06}
+          />
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-8">
         {/* Net Worth Chart */}
-        <div className="lg:col-span-2 bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8 flex flex-col">
+        <Card level={1} padding="lg" className="lg:col-span-2 flex flex-col">
           <div className="flex justify-between items-center mb-8">
-            <h3 className="text-lg lg:text-xl font-bold text-white">Net Worth Growth</h3>
-            <select
-              value={chartRange}
-              onChange={(e) => setChartRange(Number(e.target.value))}
-              className="px-3 py-1.5 rounded-lg bg-emerald-400/10 text-emerald-400 text-xs font-bold uppercase tracking-wider border border-emerald-400/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer"
-            >
+            <h3 className="text-lg lg:text-xl font-bold text-[var(--text-primary)]">Net Worth Growth</h3>
+            <Select pill value={chartRange} onChange={(e) => setChartRange(Number(e.target.value))}>
               <option value={6}>6 Months</option>
               <option value={12}>1 Year</option>
               <option value={24}>2 Years</option>
-            </select>
+            </Select>
           </div>
           <div className="h-[250px] lg:h-[300px] w-full mt-auto">
             {totalNetWorth > 0 || accounts.length > 0 ? (
@@ -213,42 +187,43 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
                 <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="colorNetWorth" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#2ee6a6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#2ee6a6" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#a1a1aa', fontSize: 11, fontWeight: 500 }} dy={10} />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#a1a1aa', fontSize: 11, fontWeight: 500 }} 
-                    tickFormatter={(val) => `${getCurrencySymbol()}${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`} 
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#8b8b94', fontSize: 11, fontWeight: 500 }} dy={10} />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#8b8b94', fontSize: 11, fontWeight: 500 }}
+                    tickFormatter={(val) => `${getCurrencySymbol()}${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
                     width={70}
                     domain={['dataMin * 0.8', 'auto']}
                   />
-                  <Tooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }} />
-                  <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorNetWorth)" />
+                  <Tooltip contentStyle={{ backgroundColor: '#191b21', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }} />
+                  <Area type="monotone" dataKey="value" stroke="#2ee6a6" strokeWidth={3} fillOpacity={1} fill="url(#colorNetWorth)" />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500 space-y-4 text-center px-4">
-                <TrendingUp className="w-12 h-12 opacity-20" />
-                <p className="text-sm font-medium">Add accounts to see net worth growth.</p>
-              </div>
+              <EmptyState
+                icon={TrendingUp}
+                title="No net worth history yet"
+                description="Add accounts to see your growth over time."
+              />
             )}
           </div>
-        </div>
+        </Card>
 
         {/* Account Breakdown (Grouped) */}
-        <div className="bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8 flex flex-col">
-          <h3 className="text-lg lg:text-xl font-bold text-white mb-6">Asset Allocation</h3>
+        <Card level={1} padding="lg" className="flex flex-col">
+          <h3 className="text-lg lg:text-xl font-bold text-[var(--text-primary)] mb-6">Asset Allocation</h3>
 
           {assetData.length > 0 && (
             <div className="h-[180px] w-full mb-6 relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Tooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '12px' }} />
+                  <Tooltip contentStyle={{ backgroundColor: '#191b21', border: '1px solid #ffffff10', borderRadius: '12px' }} />
                   <Pie data={assetData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
                     {assetData.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -258,20 +233,20 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
               </ResponsiveContainer>
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="text-center mt-1">
-                  <span className="text-emerald-400 font-bold text-xs uppercase tracking-widest block">Total</span>
-                  <span className="text-white font-bold text-lg">{formatCurrency(totalNetWorth)}</span>
+                  <span className="text-[var(--accent)] font-bold text-xs uppercase tracking-widest block">Total</span>
+                  <span className="tnum text-[var(--text-primary)] font-bold text-lg">{formatCurrency(totalNetWorth)}</span>
                 </div>
               </div>
             </div>
           )}
 
           {groupedAccounts.length > 0 ? (
-            <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1 mb-6">
+            <div className="space-y-3.5 overflow-y-auto pr-2 custom-scrollbar flex-1 mb-6">
               {groupedAccounts.map(([type, group]) => {
                 const percentage = totalNetWorth > 0 ? ((group.total / totalNetWorth) * 100).toFixed(1) : '0.0';
                 return (
-                  <button 
-                    key={type} 
+                  <button
+                    key={type}
                     onClick={() => setSelectedGroup(type)}
                     className="w-full flex items-center justify-between group text-left hover:bg-white/5 p-2 -mx-2 rounded-2xl transition-all"
                   >
@@ -283,174 +258,130 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
                         <group.icon className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-white text-sm font-bold">{group.label}</p>
-                        <p className="text-zinc-500 text-[10px] uppercase tracking-widest font-medium">{group.accounts.length} Accounts</p>
+                        <p className="text-[var(--text-primary)] text-sm font-bold">{group.label}</p>
+                        <p className="text-[var(--text-tertiary)] text-[10px] uppercase tracking-widest font-medium">{group.accounts.length} Accounts</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="text-white text-sm font-bold">{formatCurrency(group.total)}</p>
+                        <p className="tnum text-[var(--text-primary)] text-sm font-bold">{formatCurrency(group.total)}</p>
                         <p className={cn("text-[10px] font-bold", `text-${group.color}`)}>
                           {percentage}%
                         </p>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-zinc-400 transition-colors" />
+                      <ChevronRight className="w-4 h-4 text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] transition-colors" />
                     </div>
                   </button>
                 );
               })}
             </div>
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500 space-y-4 border border-dashed border-white/10 rounded-2xl mb-6">
-              <DollarSign className="w-8 h-8 opacity-20" />
-              <p className="text-sm font-medium">No accounts added yet.</p>
-            </div>
+            <EmptyState icon={DollarSign} title="No accounts added yet" bordered className="flex-1 mb-6" />
           )}
-          <button
-            onClick={() => setActiveTab('settings')}
-            className="w-full mt-auto py-4 rounded-2xl border border-white/5 text-zinc-300 hover:text-white bg-white/5 hover:bg-white/10 transition-all text-xs font-bold uppercase tracking-widest mt-4">
+          <Button variant="secondary" onClick={() => setActiveTab('settings')} className="w-full mt-auto">
             View All Accounts
-          </button>
-        </div>
+          </Button>
+        </Card>
       </div>
 
       {/* Income vs Expense */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-        <div className="bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-8">
+        <Card level={1} padding="lg">
           <div className="flex justify-between items-center mb-8">
-            <h3 className="text-lg lg:text-xl font-bold text-white">Income vs Expenses</h3>
-            <select
-              value={flowChartRange}
-              onChange={(e) => setFlowChartRange(Number(e.target.value))}
-              className="px-3 py-1.5 rounded-lg bg-emerald-400/10 text-emerald-400 text-xs font-bold uppercase tracking-wider border border-emerald-400/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer"
-            >
+            <h3 className="text-lg lg:text-xl font-bold text-[var(--text-primary)]">Income vs Expenses</h3>
+            <Select pill value={flowChartRange} onChange={(e) => setFlowChartRange(Number(e.target.value))}>
               <option value={6}>6 Months</option>
               <option value={12}>1 Year</option>
               <option value={24}>2 Years</option>
-            </select>
+            </Select>
           </div>
           <div className="h-[250px] lg:h-[300px] w-full mt-auto">
             {flowData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={flowData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#a1a1aa', fontSize: 11, fontWeight: 500 }} dy={10} />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#a1a1aa', fontSize: 11, fontWeight: 500 }} 
-                    tickFormatter={(val) => `${getCurrencySymbol()}${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`} 
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#8b8b94', fontSize: 11, fontWeight: 500 }} dy={10} />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#8b8b94', fontSize: 11, fontWeight: 500 }}
+                    tickFormatter={(val) => `${getCurrencySymbol()}${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
                     width={70}
                     domain={['dataMin * 0.8', 'auto']}
                   />
-                  <Tooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }} />
-                  <Bar dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  <Tooltip contentStyle={{ backgroundColor: '#191b21', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }} />
+                  <Bar dataKey="income" fill="#2ee6a6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="expense" fill="#f2554e" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500 space-y-4 text-center px-4">
-                <PieChartIcon className="w-12 h-12 opacity-20" />
-                <p className="text-sm font-medium">No cashflow data for this month.</p>
-              </div>
+              <EmptyState icon={PieChartIcon} title="No cashflow data for this month" />
             )}
           </div>
-        </div>
+        </Card>
 
-        <div className="bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8">
-          <h3 className="text-lg lg:text-xl font-bold text-white mb-6">Smart Insights</h3>
+        <Card level={1} padding="lg">
+          <h3 className="text-lg lg:text-xl font-bold text-[var(--text-primary)] mb-6">Smart Insights</h3>
           <InsightCards insights={smartInsights} maxShow={3} />
-        </div>
+        </Card>
       </div>
 
       {/* Health Score + Forecast */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-8">
         <HealthScoreCard score={healthScore} compact />
         {forecast ? (
-          <div className="bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8">
-            <h3 className="text-lg lg:text-xl font-bold text-white mb-6">Net Worth Forecast</h3>
+          <Card level={1} padding="lg">
+            <h3 className="text-lg lg:text-xl font-bold text-[var(--text-primary)] mb-6">Net Worth Forecast</h3>
             <ForecastSection forecast={forecast} history={history} compact />
-          </div>
+          </Card>
         ) : (
-          <div className="bg-[#151518] border border-white/5 rounded-[32px] p-6 lg:p-8 flex items-center justify-center">
-            <p className="text-zinc-600 text-sm text-center">More data needed for forecasting.</p>
-          </div>
+          <Card level={1} padding="lg" className="flex items-center justify-center">
+            <p className="text-[var(--text-tertiary)] text-sm text-center">More data needed for forecasting.</p>
+          </Card>
         )}
       </div>
 
       {/* Detail Modal */}
-      <AnimatePresence>
-        {selectedGroup && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedGroup(null)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100]"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed inset-x-4 top-[15%] bottom-[15%] lg:inset-auto lg:top-[20%] lg:left-1/2 lg:-translate-x-1/2 lg:w-[500px] bg-[#1a1a1f] border border-white/10 rounded-[32px] p-8 z-[110] shadow-2xl overflow-hidden flex flex-col"
-            >
-              <div className="flex items-start justify-between mb-8">
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center",
-                    selectedGroup === 'bank' ? 'text-blue-400' : 
-                    selectedGroup === 'cash' ? 'text-emerald-400' : 'text-amber-400'
-                  )}>
-                    {selectedGroup === 'bank' ? <CreditCard /> : selectedGroup === 'cash' ? <Wallet /> : <Briefcase />}
+      <Modal
+        open={!!selectedGroup}
+        onClose={() => setSelectedGroup(null)}
+        title={selectedGroup ? `${selectedGroup.charAt(0).toUpperCase()}${selectedGroup.slice(1)}s` : ''}
+        description={selectedGroup ? `Breakdown of your ${selectedGroup} accounts` : ''}
+        footer={
+          selectedGroup && (
+            <div className="flex justify-between items-center">
+              <p className="text-[var(--text-tertiary)] text-sm font-bold uppercase tracking-widest">Total {selectedGroup}s</p>
+              <p className="tnum text-[var(--text-primary)] text-2xl font-bold">
+                {formatCurrency(selectedGroupData?.total || 0)}
+              </p>
+            </div>
+          )
+        }
+      >
+        <div className="space-y-3">
+          {(selectedGroupData?.accounts || [])
+            .sort((a: any, b: any) => Number(b.balance || 0) - Number(a.balance || 0))
+            .map((acc: any) => (
+              <div key={acc.id} className="bg-white/5 rounded-2xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-[var(--text-tertiary)]">
+                    <DollarSign className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-white text-2xl font-bold capitalize">{selectedGroup}s</h3>
-                    <p className="text-zinc-500 text-sm">Breakdown of your {selectedGroup} accounts</p>
+                    <p className="text-[var(--text-primary)] font-bold text-sm">{acc.name || 'Account'}</p>
+                    <p className="text-[var(--text-tertiary)] text-xs">{acc.type || 'N/A'}</p>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setSelectedGroup(null)}
-                  className="p-2 rounded-xl bg-white/5 text-zinc-400 hover:text-white transition-all"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="text-right">
+                  <p className="tnum text-[var(--text-primary)] font-bold">{formatCurrency(acc.balance || 0)}</p>
+                  <p className="text-[var(--accent)] text-xs font-bold">
+                    {totalNetWorth > 0 ? ((Number(acc.balance || 0) / totalNetWorth) * 100).toFixed(1) : '0.0'}%
+                  </p>
+                </div>
               </div>
-
-              <div className="space-y-4 overflow-y-auto flex-1 pr-2 custom-scrollbar">
-                {(groupedAccounts.find(([type]) => type === selectedGroup)?.[1]?.accounts || [])
-                  .sort((a: any, b: any) => Number(b.balance || 0) - Number(a.balance || 0))
-                  .map((acc: any) => (
-                    <div key={acc.id} className="bg-white/5 rounded-2xl p-5 flex items-center justify-between group">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-zinc-400">
-                          <DollarSign className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="text-white font-bold">{acc.name || 'Account'}</p>
-                          <p className="text-zinc-500 text-xs">{acc.type || 'N/A'}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-white font-bold text-lg">{formatCurrency(acc.balance || 0)}</p>
-                        <p className="text-emerald-400 text-xs font-bold">
-                          {totalNetWorth > 0 ? ((Number(acc.balance || 0) / totalNetWorth) * 100).toFixed(1) : '0.0'}%
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-
-              <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center">
-                <p className="text-zinc-500 text-sm font-bold uppercase tracking-widest">Total {selectedGroup}s</p>
-                <p className="text-white text-2xl font-bold">
-                  {formatCurrency(groupedAccounts.find(([type]) => type === selectedGroup)?.[1]?.total || 0)}
-                </p>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+            ))}
+        </div>
+      </Modal>
     </div>
   );
 }

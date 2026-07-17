@@ -16,10 +16,10 @@ import {
   X
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
-import { motion, AnimatePresence } from 'motion/react';
 import { useApi } from '@/src/hooks/useApi';
 
 import SmartTransactionInput from '@/src/components/SmartTransactionInput';
+import { Card, Button, PageHeader, Modal } from '@/src/components/ui';
 
 const getLocalDatetimePattern = (dateStr?: string | null) => {
   if (!dateStr) {
@@ -29,14 +29,14 @@ const getLocalDatetimePattern = (dateStr?: string | null) => {
   }
   if (dateStr.length === 16 && dateStr.includes('T')) return dateStr;
   if (dateStr.length === 10 && !dateStr.includes('T')) return `${dateStr}T00:00`;
-  
+
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) {
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     return now.toISOString().slice(0, 16);
   }
-  
+
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
@@ -48,6 +48,15 @@ const getLocalDatetimePattern = (dateStr?: string | null) => {
 interface TransactionsProps {
   setActiveTab: (tab: string) => void;
 }
+
+const typeStyles: Record<string, { icon: any; text: string; bg: string }> = {
+  income: { icon: ArrowUpRight, text: 'text-[var(--accent)]', bg: 'bg-[var(--accent-soft)]' },
+  expense: { icon: ArrowDownRight, text: 'text-[var(--danger)]', bg: 'bg-[var(--danger-soft)]' },
+  transfer: { icon: ArrowLeftRight, text: 'text-blue-400', bg: 'bg-blue-400/10' },
+};
+
+const fieldClasses =
+  'w-full bg-[var(--surface-2)] border border-[var(--border-2)] rounded-xl px-3.5 py-2.5 text-[var(--text-primary)] text-sm focus:ring-2 focus:ring-[var(--accent-ring)] outline-none [&>option]:bg-[var(--surface-2)]';
 
 export default function Transactions({ setActiveTab }: TransactionsProps) {
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -71,11 +80,11 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFiltersMenu, setShowFiltersMenu] = useState(false);
   const [showDateMenu, setShowDateMenu] = useState(false);
-  
+
   const [filterType, setFilterType] = useState<'all' | 'expense' | 'income' | 'transfer'>('all');
   const [filterCategoryId, setFilterCategoryId] = useState<string>('all');
   const [filterAccountId, setFilterAccountId] = useState<string>('all');
-  
+
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
   const [filterCurrentMonth, setFilterCurrentMonth] = useState(true);
@@ -84,14 +93,11 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
-  // Close action dropdowns when clicking outside
+  // Close row action dropdown when clicking outside
   React.useEffect(() => {
     const close = (e: MouseEvent) => {
-      // Don't close if clicking inside a dropdown
-      if ((e.target as Element).closest('.filter-dropdown')) return;
+      if ((e.target as Element).closest('.row-menu')) return;
       setOpenMenuId(null);
-      setShowFiltersMenu(false);
-      setShowDateMenu(false);
     };
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
@@ -167,7 +173,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
 
   // Bulk selection handlers
   const handleToggleSelect = (id: string) => {
-    setSelectedIds(prev => 
+    setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -182,7 +188,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
 
   const handleBulkDelete = async () => {
     if (!selectedIds.length || isDeletingBulk) return;
-    
+
     // Safety check with browser confirm since this is a destructive action
     if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} transactions? This cannot be undone.`)) {
       return;
@@ -196,7 +202,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
       await Promise.all(
         selectedIds.map(id => fetchWithAuth(`/api/transactions/${id}`, { method: 'DELETE' }))
       );
-      
+
       setSelectedIds([]); // Clear selection on success
       fetchTransactions(); // Refresh the list
     } catch (err) {
@@ -325,7 +331,7 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
     }
   };
 
-  const hasActiveFilters = filterType !== 'all' || filterCategoryId !== 'all' || filterAccountId !== 'all' || dateStart || dateEnd || !filterCurrentMonth;
+  const hasActiveFilters = filterType !== 'all' || filterCategoryId !== 'all' || filterAccountId !== 'all' || !!dateStart || !!dateEnd || !filterCurrentMonth;
   const clearFilters = () => {
     setFilterType('all');
     setFilterCategoryId('all');
@@ -338,48 +344,29 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
 
   return (
     <div className="space-y-6 lg:space-y-8 max-w-7xl mx-auto pb-12 lg:pb-0">
-      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-6">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">Transactions</h1>
-          <p className="text-zinc-500 mt-1 text-sm lg:text-base">Manage and track every movement of your wealth.</p>
-        </div>
-        
-        {/* Bulk Actions or New Transaction Button */}
-        {selectedIds.length > 0 ? (
-          <div className="flex items-center gap-4 bg-red-500/10 border border-red-500/20 rounded-2xl px-6 py-3 shadow-lg shadow-red-500/10">
-            <div className="text-red-400 font-bold text-sm">
-              {selectedIds.length} selected
+      <PageHeader
+        title="Transactions"
+        description="Manage and track every movement of your wealth."
+        actions={
+          selectedIds.length > 0 ? (
+            <div className="flex items-center gap-3 bg-[var(--danger-soft)] border border-[var(--danger)]/20 rounded-2xl px-5 py-2.5">
+              <span className="text-[var(--danger)] font-bold text-sm">{selectedIds.length} selected</span>
+              <div className="w-px h-5 bg-[var(--danger)]/20" />
+              <Button variant="danger" size="sm" onClick={handleBulkDelete} disabled={isDeletingBulk}>
+                {isDeletingBulk ? 'Deleting…' : (<><Trash2 className="w-4 h-4" />Delete</>)}
+              </Button>
+              <button onClick={() => setSelectedIds([])} className="text-[var(--text-tertiary)] hover:text-white text-sm font-medium px-1">
+                Cancel
+              </button>
             </div>
-            <div className="w-px h-6 bg-red-500/20"></div>
-            <button
-              onClick={handleBulkDelete}
-              disabled={isDeletingBulk}
-              className="flex items-center gap-2 text-white bg-red-500 hover:bg-red-600 px-4 py-2 rounded-xl font-bold transition-all text-sm disabled:opacity-50"
-            >
-              {isDeletingBulk ? 'Deleting...' : (
-                <>
-                  <Trash2 className="w-4 h-4" />
-                  Delete Selected
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => setSelectedIds([])}
-              className="text-zinc-400 hover:text-white px-2 py-2 text-sm font-medium transition-all"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => handleSmartEdit('expense')}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 text-sm lg:text-base"
-          >
-            <Plus className="w-5 h-5" />
-            New Transaction
-          </button>
-        )}
-      </div>
+          ) : (
+            <Button onClick={() => handleSmartEdit('expense')} size="lg">
+              <Plus className="w-5 h-5" />
+              New Transaction
+            </Button>
+          )
+        }
+      />
 
       {/* Smart Input Area */}
       {selectedIds.length === 0 && (
@@ -395,189 +382,93 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
 
       {/* Filters & History */}
       <div className="space-y-4">
-        <div className="flex flex-col md:flex-row gap-3 justify-between items-center z-20 relative">
+        <div className="flex flex-col md:flex-row gap-3 justify-between items-center">
           <div className="relative w-full md:w-96">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary)]" />
             <input
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search transactions..."
-              className="w-full bg-[#151518] border border-white/5 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm"
+              className="w-full bg-[var(--surface-1)] border border-[var(--border-1)] rounded-2xl pl-12 pr-4 py-3.5 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)] transition-all text-sm"
             />
             {searchQuery && (
-              <button 
+              <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
             )}
           </div>
-          <div className="flex gap-2 w-full md:w-auto overflow-visible pb-1 md:pb-0 relative filter-dropdown z-30">
+          <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
             {hasActiveFilters && (
-              <button 
+              <button
                 onClick={clearFilters}
-                className="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all text-xs font-bold uppercase tracking-widest"
+                className="shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-[var(--danger)]/20 bg-[var(--danger-soft)] text-[var(--danger)] hover:bg-[var(--danger)]/20 transition-all text-xs font-bold uppercase tracking-widest"
               >
                 Clear
               </button>
             )}
 
-            {/* Current Month Toggle Button */}
-            <button 
-              onClick={(e) => { 
-                e.stopPropagation(); 
+            <button
+              onClick={() => {
                 if (!filterCurrentMonth) {
-                  // If turning ON, clear any custom date range that conflicts
                   setDateStart('');
                   setDateEnd('');
                 }
-                setFilterCurrentMonth(!filterCurrentMonth); 
-                setShowFiltersMenu(false); 
-                setShowDateMenu(false); 
+                setFilterCurrentMonth(!filterCurrentMonth);
               }}
               className={cn(
-                "flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all text-xs font-bold uppercase tracking-widest relative z-50",
-                filterCurrentMonth 
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)]" 
-                  : "border-white/5 bg-[#151518] text-zinc-400 hover:text-white hover:bg-white/5"
+                "shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all text-xs font-bold uppercase tracking-widest",
+                filterCurrentMonth
+                  ? "border-[var(--accent)]/30 bg-[var(--accent-soft)] text-[var(--accent)]"
+                  : "border-[var(--border-1)] bg-[var(--surface-1)] text-[var(--text-tertiary)] hover:text-white hover:bg-white/5"
               )}
             >
-              <Calendar className="w-4 h-4 pointer-events-none" />
-              <span className="pointer-events-none">Current Month</span>
+              <Calendar className="w-4 h-4" />
+              Current Month
             </button>
 
-            {/* Filters Button & Dropdown */}
-            <div className="relative inline-block z-40">
-              <button 
-                onClick={(e) => { e.stopPropagation(); setShowFiltersMenu(!showFiltersMenu); setShowDateMenu(false); }}
-                className={cn(
-                  "flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all text-xs font-bold uppercase tracking-widest relative z-50",
-                  (filterType !== 'all' || filterCategoryId !== 'all' || filterAccountId !== 'all') 
-                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" 
-                    : "border-white/5 bg-[#151518] text-zinc-400 hover:text-white hover:bg-white/5"
-                )}
-              >
-                <Filter className="w-4 h-4 pointer-events-none" />
-                <span className="pointer-events-none">Filters</span>
-              </button>
-              
-              <AnimatePresence>
-                {showFiltersMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="absolute right-0 md:right-auto md:left-0 top-full mt-2 w-72 bg-[#1a1a1f] border border-white/10 rounded-2xl shadow-2xl z-50 p-4 space-y-4 filter-dropdown"
-                  >
-                    <div>
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Type</label>
-                      <select 
-                        value={filterType} 
-                        onChange={e => setFilterType(e.target.value as any)}
-                        className="w-full bg-[#151518] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none"
-                      >
-                        <option value="all">All Types</option>
-                        <option value="expense">Expense</option>
-                        <option value="income">Income</option>
-                        <option value="transfer">Transfer</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Category</label>
-                      <select 
-                        value={filterCategoryId} 
-                        onChange={e => setFilterCategoryId(e.target.value)}
-                        className="w-full bg-[#151518] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none"
-                      >
-                        <option value="all">All Categories</option>
-                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Account</label>
-                      <select 
-                        value={filterAccountId} 
-                        onChange={e => setFilterAccountId(e.target.value)}
-                        className="w-full bg-[#151518] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none"
-                      >
-                        <option value="all">All Accounts</option>
-                        {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                      </select>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <button
+              onClick={() => setShowFiltersMenu(true)}
+              className={cn(
+                "shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all text-xs font-bold uppercase tracking-widest",
+                (filterType !== 'all' || filterCategoryId !== 'all' || filterAccountId !== 'all')
+                  ? "border-[var(--accent)]/30 bg-[var(--accent-soft)] text-[var(--accent)]"
+                  : "border-[var(--border-1)] bg-[var(--surface-1)] text-[var(--text-tertiary)] hover:text-white hover:bg-white/5"
+              )}
+            >
+              <Filter className="w-4 h-4" />
+              Filters
+            </button>
 
-            {/* Date Range Button & Dropdown */}
-            <div className="relative inline-block z-40">
-              <button 
-                onClick={(e) => { e.stopPropagation(); setShowDateMenu(!showDateMenu); setShowFiltersMenu(false); }}
-                className={cn(
-                  "flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all text-xs font-bold uppercase tracking-widest relative z-50",
-                  (dateStart || dateEnd) 
-                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" 
-                    : "border-white/5 bg-[#151518] text-zinc-400 hover:text-white hover:bg-white/5"
-                )}
-              >
-                <Calendar className="w-4 h-4 pointer-events-none" />
-                <span className="pointer-events-none">Date Range</span>
-              </button>
-
-              <AnimatePresence>
-                {showDateMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="absolute right-0 top-full mt-2 w-64 bg-[#1a1a1f] border border-white/10 rounded-2xl shadow-2xl z-50 p-4 space-y-4 filter-dropdown"
-                  >
-                    <div>
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Start Date</label>
-                      <input 
-                        type="date" 
-                        value={dateStart}
-                        onChange={e => { setDateStart(e.target.value); setFilterCurrentMonth(false); }}
-                        className="w-full bg-[#151518] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">End Date</label>
-                      <input 
-                        type="date" 
-                        value={dateEnd}
-                        onChange={e => { setDateEnd(e.target.value); setFilterCurrentMonth(false); }}
-                        className="w-full bg-[#151518] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-emerald-500/50 outline-none"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                       <button 
-                        onClick={() => { setDateStart(''); setDateEnd(''); }}
-                        className="flex-1 py-2 rounded-lg bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 text-xs font-bold transition-all"
-                       >
-                         Clear
-                       </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <button
+              onClick={() => setShowDateMenu(true)}
+              className={cn(
+                "shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all text-xs font-bold uppercase tracking-widest",
+                (dateStart || dateEnd)
+                  ? "border-[var(--accent)]/30 bg-[var(--accent-soft)] text-[var(--accent)]"
+                  : "border-[var(--border-1)] bg-[var(--surface-1)] text-[var(--text-tertiary)] hover:text-white hover:bg-white/5"
+              )}
+            >
+              <Calendar className="w-4 h-4" />
+              Date Range
+            </button>
           </div>
         </div>
 
         {/* Desktop Table / Mobile Cards */}
-        <div className="bg-[#151518] border border-white/5 rounded-[32px] overflow-hidden shadow-2xl">
+        <Card level={1} padding="none" className="overflow-hidden">
           {/* Desktop Table View */}
           <div className="hidden lg:block overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-white/[0.02] text-zinc-500 text-[10px] uppercase tracking-widest">
+                <tr className="bg-white/[0.02] text-[var(--text-tertiary)] text-[10px] uppercase tracking-widest">
                   <th className="px-8 py-5 font-bold w-12">
                     <input
                       type="checkbox"
-                      className="w-4 h-4 rounded border-white/10 bg-transparent text-emerald-500 focus:ring-emerald-500/50 focus:ring-offset-0 cursor-pointer"
+                      className="w-4 h-4 rounded border-[var(--border-2)] bg-transparent text-[var(--accent)] focus:ring-[var(--accent-ring)] focus:ring-offset-0 cursor-pointer"
                       checked={filteredTransactions.length > 0 && selectedIds.length === filteredTransactions.length}
                       onChange={handleToggleSelectAll}
                       disabled={filteredTransactions.length === 0}
@@ -590,102 +481,193 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                   <th className="px-8 py-5 font-bold text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-[var(--border-1)]">
                 {filteredTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-8 py-16 text-center text-zinc-500">
+                    <td colSpan={6} className="px-8 py-16 text-center text-[var(--text-tertiary)]">
                       {transactions.length === 0 ? 'No transactions found. Start by adding your first one!' : 'No transactions match your current filters.'}
                     </td>
                   </tr>
                 ) : (
-                  filteredTransactions.map((t) => (
-                    <tr 
-                      key={t.id} 
+                  filteredTransactions.map((t) => {
+                    const style = typeStyles[t.type] || typeStyles.transfer;
+                    return (
+                      <tr
+                        key={t.id}
+                        className={cn(
+                          "transition-colors group cursor-pointer",
+                          selectedIds.includes(t.id) ? "bg-[var(--accent-soft)]" : "hover:bg-white/[0.02]"
+                        )}
+                        onClick={() => handleToggleSelect(t.id)}
+                      >
+                        <td className="px-8 py-6 w-12" onClick={e => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 rounded border-[var(--border-2)] bg-transparent text-[var(--accent)] focus:ring-[var(--accent-ring)] focus:ring-offset-0 cursor-pointer"
+                            checked={selectedIds.includes(t.id)}
+                            onChange={() => handleToggleSelect(t.id)}
+                          />
+                        </td>
+                        <td className="px-4 py-6">
+                          <p className="text-[var(--text-primary)] font-bold text-sm">{new Date(t.date).toLocaleDateString()}</p>
+                          <p className="text-[var(--text-tertiary)] text-[10px] font-medium uppercase tracking-wider">{new Date(t.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="flex items-center gap-4">
+                            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110", style.bg, style.text)}>
+                              <style.icon className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="text-[var(--text-primary)] font-bold text-sm">{t.note || 'No description'}</p>
+                              <p className="text-[var(--text-tertiary)] text-[10px] font-bold uppercase tracking-widest">{t.type}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2 text-[var(--text-secondary)] text-xs font-medium">
+                              <Tag className="w-3 h-3" />
+                              {t.category_name || 'Uncategorized'}
+                            </div>
+                            <div className="flex items-center gap-2 text-[var(--text-tertiary)] text-[10px] font-bold uppercase tracking-widest">
+                              <CreditCard className="w-3 h-3" />
+                              {t.from_account_name || t.to_account_name}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <p className={cn("tnum font-bold text-lg tracking-tight", style.text)}>
+                            {t.type === 'expense' ? '-' : t.type === 'income' ? '+' : ''}
+                            {formatCurrency(t.amount)}
+                          </p>
+                        </td>
+                        <td className="px-8 py-6 text-right">
+                          <div className="relative row-menu">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(openMenuId === t.id ? null : t.id);
+                              }}
+                              className="p-3 rounded-xl hover:bg-white/5 text-[var(--text-tertiary)] hover:text-white transition-all"
+                            >
+                              <MoreVertical className="w-5 h-5" />
+                            </button>
+                            {openMenuId === t.id && (
+                              <div
+                                onClick={e => e.stopPropagation()}
+                                className="absolute right-0 top-12 z-50 bg-[var(--surface-2)] border border-[var(--border-2)] rounded-2xl shadow-2xl overflow-hidden min-w-[140px]"
+                              >
+                                <button
+                                  onClick={() => handleEditTransaction(t)}
+                                  className="flex items-center gap-3 w-full px-4 py-3 text-sm text-[var(--text-secondary)] hover:text-white hover:bg-white/5 transition-all"
+                                >
+                                  <Edit2 className="w-4 h-4 text-blue-400" />
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTransaction(t.id)}
+                                  className="flex items-center gap-3 w-full px-4 py-3 text-sm text-[var(--danger)] hover:bg-[var(--danger-soft)] transition-all border-t border-[var(--border-1)]"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="lg:hidden divide-y divide-[var(--border-1)]">
+            {filteredTransactions.length === 0 ? (
+              <div className="px-6 py-16 text-center text-[var(--text-tertiary)]">
+                 {transactions.length === 0 ? 'No transactions found.' : 'No transactions match filters.'}
+              </div>
+            ) : (
+              <>
+                <div className="px-5 py-3.5 flex items-center justify-between bg-white/[0.02]">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-[var(--border-2)] bg-transparent text-[var(--accent)] focus:ring-[var(--accent-ring)] focus:ring-offset-0 cursor-pointer"
+                      checked={filteredTransactions.length > 0 && selectedIds.length === filteredTransactions.length}
+                      onChange={handleToggleSelectAll}
+                    />
+                    <span className="text-[var(--text-secondary)] text-xs font-bold uppercase tracking-widest">Select All</span>
+                  </div>
+                  <span className="text-[var(--text-tertiary)] text-xs font-medium">{filteredTransactions.length} items</span>
+                </div>
+                {filteredTransactions.map((t) => {
+                  const style = typeStyles[t.type] || typeStyles.transfer;
+                  return (
+                    <div
+                      key={t.id}
                       className={cn(
-                        "transition-colors group cursor-pointer",
-                        selectedIds.includes(t.id) ? "bg-emerald-500/5" : "hover:bg-white/[0.02]"
+                        "p-5 flex items-center justify-between active:bg-white/[0.02] transition-colors cursor-pointer",
+                        selectedIds.includes(t.id) ? "bg-[var(--accent-soft)]" : ""
                       )}
                       onClick={() => handleToggleSelect(t.id)}
                     >
-                      <td className="px-8 py-6 w-12" onClick={e => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          className="w-4 h-4 rounded border-white/10 bg-transparent text-emerald-500 focus:ring-emerald-500/50 focus:ring-offset-0 cursor-pointer"
-                          checked={selectedIds.includes(t.id)}
-                          onChange={() => handleToggleSelect(t.id)}
-                        />
-                      </td>
-                      <td className="px-4 py-6">
-                        <p className="text-white font-bold text-sm">{new Date(t.date).toLocaleDateString()}</p>
-                        <p className="text-zinc-500 text-[10px] font-medium uppercase tracking-wider">{new Date(t.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-4">
-                          <div className={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110",
-                            t.type === 'income' ? "bg-emerald-400/10 text-emerald-400" :
-                              t.type === 'expense' ? "bg-red-400/10 text-red-400" :
-                                "bg-blue-400/10 text-blue-400"
-                          )}>
-                            {t.type === 'income' ? <ArrowUpRight className="w-5 h-5" /> :
-                              t.type === 'expense' ? <ArrowDownRight className="w-5 h-5" /> :
-                                <ArrowLeftRight className="w-5 h-5" />}
-                          </div>
-                          <div>
-                            <p className="text-white font-bold text-sm">{t.note || 'No description'}</p>
-                            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">{t.type}</p>
-                          </div>
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div onClick={e => e.stopPropagation()} className="shrink-0">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 rounded border-[var(--border-2)] bg-transparent text-[var(--accent)] focus:ring-[var(--accent-ring)] focus:ring-offset-0 cursor-pointer"
+                            checked={selectedIds.includes(t.id)}
+                            onChange={() => handleToggleSelect(t.id)}
+                          />
                         </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center gap-2 text-zinc-400 text-xs font-medium">
-                            <Tag className="w-3 h-3" />
-                            {t.category_name || 'Uncategorized'}
-                          </div>
-                          <div className="flex items-center gap-2 text-zinc-500 text-[10px] font-bold uppercase tracking-widest">
-                            <CreditCard className="w-3 h-3" />
-                            {t.from_account_name || t.to_account_name}
-                          </div>
+                        <div className={cn("w-11 h-11 rounded-2xl flex items-center justify-center shrink-0", style.bg, style.text)}>
+                          <style.icon className="w-5 h-5" />
                         </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <p className={cn(
-                          "font-bold text-lg tracking-tight",
-                          t.type === 'income' ? "text-emerald-400" :
-                            t.type === 'expense' ? "text-red-400" :
-                              "text-blue-400"
-                        )}>
+                        <div className="min-w-0">
+                          <p className="text-[var(--text-primary)] font-bold text-sm leading-tight truncate">{t.note || 'No description'}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[var(--text-tertiary)] text-[10px] font-bold uppercase tracking-widest truncate">{t.category_name || 'Misc'}</span>
+                            <span className="w-1 h-1 rounded-full bg-[var(--border-3)] shrink-0" />
+                            <span className="text-[var(--text-tertiary)] text-[10px] font-bold uppercase tracking-widest truncate">{t.from_account_name || t.to_account_name}</span>
+                          </div>
+                          <p className="text-[var(--text-tertiary)] text-[10px] mt-1 font-medium uppercase tracking-wider">
+                            {new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} • {new Date(t.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0 pl-2">
+                        <p className={cn("tnum font-bold text-base tracking-tight", style.text)}>
                           {t.type === 'expense' ? '-' : t.type === 'income' ? '+' : ''}
                           {formatCurrency(t.amount)}
                         </p>
-                      </td>
-                      <td className="px-8 py-6 text-right">
-                        <div className="relative">
+                        <div className="relative row-menu">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setOpenMenuId(openMenuId === t.id ? null : t.id);
                             }}
-                            className="p-3 rounded-xl hover:bg-white/5 text-zinc-500 hover:text-white transition-all"
+                            className="p-2.5 -mr-2 text-[var(--text-tertiary)] hover:text-white rounded-lg hover:bg-white/5 transition-all"
                           >
-                            <MoreVertical className="w-5 h-5" />
+                            <MoreVertical className="w-4 h-4" />
                           </button>
                           {openMenuId === t.id && (
                             <div
                               onClick={e => e.stopPropagation()}
-                              className="absolute right-0 top-12 z-50 bg-[#1a1a1f] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[140px]"
+                              className="absolute right-0 top-9 z-50 bg-[var(--surface-2)] border border-[var(--border-2)] rounded-2xl shadow-2xl overflow-hidden min-w-[140px]"
                             >
                               <button
                                 onClick={() => handleEditTransaction(t)}
-                                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-zinc-300 hover:text-white hover:bg-white/5 transition-all"
+                                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-[var(--text-secondary)] hover:text-white hover:bg-white/5 transition-all"
                               >
                                 <Edit2 className="w-4 h-4 text-blue-400" />
                                 Edit
                               </button>
                               <button
                                 onClick={() => handleDeleteTransaction(t.id)}
-                                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/5 transition-all border-t border-white/5"
+                                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-[var(--danger)] hover:bg-[var(--danger-soft)] transition-all border-t border-[var(--border-1)]"
                               >
                                 <Trash2 className="w-4 h-4" />
                                 Delete
@@ -693,300 +675,221 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
                             </div>
                           )}
                         </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile Card View */}
-          <div className="lg:hidden divide-y divide-white/5">
-            {filteredTransactions.length === 0 ? (
-              <div className="px-6 py-16 text-center text-zinc-500">
-                 {transactions.length === 0 ? 'No transactions found.' : 'No transactions match filters.'}
-              </div>
-            ) : (
-              // Add a "Select All" toggle for mobile view exactly right above the first row
-              <>
-                <div className="px-6 py-4 flex items-center justify-between bg-white/[0.02]">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 rounded border-white/10 bg-transparent text-emerald-500 focus:ring-emerald-500/50 focus:ring-offset-0 cursor-pointer"
-                      checked={filteredTransactions.length > 0 && selectedIds.length === filteredTransactions.length}
-                      onChange={handleToggleSelectAll}
-                    />
-                    <span className="text-zinc-400 text-xs font-bold uppercase tracking-widest">Select All</span>
-                  </div>
-                </div>
-                {filteredTransactions.map((t) => (
-                  <div 
-                    key={t.id} 
-                    className={cn(
-                      "p-6 flex items-center justify-between active:bg-white/[0.02] transition-colors cursor-pointer",
-                      selectedIds.includes(t.id) ? "bg-emerald-500/5" : ""
-                    )}
-                    onClick={() => handleToggleSelect(t.id)}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div onClick={e => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          className="w-4 h-4 rounded border-white/10 bg-transparent text-emerald-500 focus:ring-emerald-500/50 focus:ring-offset-0 cursor-pointer"
-                          checked={selectedIds.includes(t.id)}
-                          onChange={() => handleToggleSelect(t.id)}
-                        />
-                      </div>
-                      <div className={cn(
-                        "w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg",
-                        t.type === 'income' ? "bg-emerald-400/10 text-emerald-400 shadow-emerald-500/5" :
-                          t.type === 'expense' ? "bg-red-400/10 text-red-400 shadow-red-500/5" :
-                            "bg-blue-400/10 text-blue-400 shadow-blue-500/5"
-                      )}>
-                        {t.type === 'income' ? <ArrowUpRight className="w-6 h-6" /> :
-                          t.type === 'expense' ? <ArrowDownRight className="w-6 h-6" /> :
-                            <ArrowLeftRight className="w-6 h-6" />}
-                      </div>
-                      <div>
-                        <p className="text-white font-bold text-sm leading-tight">{t.note || 'No description'}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">{t.category_name || 'Misc'}</span>
-                          <span className="w-1 h-1 rounded-full bg-zinc-700" />
-                          <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">{t.from_account_name || t.to_account_name}</span>
-                        </div>
-                        <p className="text-zinc-600 text-[10px] mt-1 font-medium uppercase tracking-wider">
-                          {new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} • {new Date(t.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className={cn(
-                        "font-bold text-base tracking-tight",
-                        t.type === 'income' ? "text-emerald-400" :
-                          t.type === 'expense' ? "text-red-400" :
-                            "text-blue-400"
-                      )}>
-                        {t.type === 'expense' ? '-' : t.type === 'income' ? '+' : ''}
-                        {formatCurrency(t.amount)}
-                      </p>
-                      <div className="relative">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenMenuId(openMenuId === t.id ? null : t.id);
-                          }}
-                          className="p-2 -mr-2 text-zinc-600 hover:text-white rounded-lg hover:bg-white/5 transition-all"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-                        {openMenuId === t.id && (
-                          <div
-                            onClick={e => e.stopPropagation()}
-                            className="absolute right-0 top-8 z-50 bg-[#1a1a1f] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[140px]"
-                          >
-                            <button
-                              onClick={() => handleEditTransaction(t)}
-                              className="flex items-center gap-3 w-full px-4 py-3 text-sm text-zinc-300 hover:text-white hover:bg-white/5 transition-all"
-                            >
-                              <Edit2 className="w-4 h-4 text-blue-400" />
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteTransaction(t.id)}
-                              className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/5 transition-all border-t border-white/5"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </>
             )}
           </div>
-        </div>
+        </Card>
       </div>
 
-      {/* Add Transaction Modal */}
-      <AnimatePresence>
-        {showAddModal && (
-          <div className="fixed inset-0 z-[100] flex items-end lg:items-center justify-center p-0 lg:p-6">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowAddModal(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+      {/* Filters Sheet */}
+      <Modal open={showFiltersMenu} onClose={() => setShowFiltersMenu(false)} title="Filters">
+        <div className="space-y-5">
+          <div>
+            <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-2 block">Type</label>
+            <select value={filterType} onChange={e => setFilterType(e.target.value as any)} className={fieldClasses}>
+              <option value="all">All Types</option>
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+              <option value="transfer">Transfer</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-2 block">Category</label>
+            <select value={filterCategoryId} onChange={e => setFilterCategoryId(e.target.value)} className={fieldClasses}>
+              <option value="all">All Categories</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-2 block">Account</label>
+            <select value={filterAccountId} onChange={e => setFilterAccountId(e.target.value)} className={fieldClasses}>
+              <option value="all">All Accounts</option>
+              {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </div>
+          <Button className="w-full" onClick={() => setShowFiltersMenu(false)}>Apply Filters</Button>
+        </div>
+      </Modal>
+
+      {/* Date Range Sheet */}
+      <Modal open={showDateMenu} onClose={() => setShowDateMenu(false)} title="Date Range">
+        <div className="space-y-5">
+          <div>
+            <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-2 block">Start Date</label>
+            <input
+              type="date"
+              value={dateStart}
+              onChange={e => { setDateStart(e.target.value); setFilterCurrentMonth(false); }}
+              className={fieldClasses}
             />
-            <motion.div
-              initial={{ opacity: 0, y: 100 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 100 }}
-              className="bg-[#151518] border-t lg:border border-white/10 rounded-t-[40px] lg:rounded-[40px] w-full max-w-xl relative z-10 overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar"
-            >
-              <div className="p-8 border-b border-white/5 sticky top-0 bg-[#151518]/80 backdrop-blur-xl z-20">
-                <div className="flex justify-between items-center mb-5">
-                  <div>
-                    <h2 className="text-2xl font-bold text-white capitalize">{editingId ? 'Edit' : 'New'} Transaction</h2>
-                    <p className="text-zinc-500 mt-1 text-sm">Fill in the details below.</p>
-                  </div>
-                  <button
-                    onClick={() => { setShowAddModal(false); setEditingId(null); }}
-                    className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white"
-                  >
-                    <Plus className="w-6 h-6 rotate-45" />
-                  </button>
-                </div>
-                {/* Type switcher tabs */}
-                {!editingId && (
-                  <div className="flex p-1 bg-white/5 rounded-2xl gap-1">
-                    {(['expense', 'income', 'transfer'] as const).map(type => (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => setActiveType(type)}
-                        className={cn(
-                          'flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all capitalize',
-                          activeType === type
-                            ? type === 'income' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
-                              : type === 'expense' ? 'bg-red-500 text-white shadow-lg shadow-red-500/20'
-                                : 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
-                            : 'text-zinc-500 hover:text-white'
-                        )}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-2 block">End Date</label>
+            <input
+              type="date"
+              value={dateEnd}
+              onChange={e => { setDateEnd(e.target.value); setFilterCurrentMonth(false); }}
+              className={fieldClasses}
+            />
+          </div>
+          <div className="flex gap-3">
+            <Button variant="secondary" className="flex-1" onClick={() => { setDateStart(''); setDateEnd(''); }}>Clear</Button>
+            <Button className="flex-1" onClick={() => setShowDateMenu(false)}>Apply</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Add/Edit Transaction Modal */}
+      <Modal
+        open={showAddModal}
+        onClose={() => { setShowAddModal(false); setEditingId(null); }}
+        title={`${editingId ? 'Edit' : 'New'} Transaction`}
+        description="Fill in the details below."
+      >
+        {!editingId && (
+          <div className="flex p-1 bg-white/5 rounded-2xl gap-1 mb-6">
+            {(['expense', 'income', 'transfer'] as const).map(type => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setActiveType(type)}
+                className={cn(
+                  'flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all capitalize',
+                  activeType === type
+                    ? type === 'income' ? 'bg-[var(--accent)] text-[#04140e]'
+                      : type === 'expense' ? 'bg-[var(--danger)] text-white'
+                        : 'bg-blue-500 text-white'
+                    : 'text-[var(--text-tertiary)] hover:text-white'
                 )}
-              </div>
-
-              <form onSubmit={handleSubmit} className="p-8 space-y-8">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-1">Amount</label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                      <input
-                        required
-                        type="number"
-                        step="0.01"
-                        value={formData.amount}
-                        onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                        placeholder="0.00"
-                        className="w-full bg-white/[0.03] border border-white/5 rounded-2xl pl-12 pr-4 py-4 text-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-1">Date</label>
-                    <input
-                      required
-                      type="datetime-local"
-                      value={formData.date}
-                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                      className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-1">
-                    {activeType === 'income' ? 'To Account' : activeType === 'expense' ? 'From Account' : 'From Account'}
-                  </label>
-                  <select
-                    required
-                    value={activeType === 'income' ? formData.to_account_id : formData.from_account_id}
-                    onChange={(e) => {
-                      if (activeType === 'income') {
-                        setFormData({ ...formData, to_account_id: e.target.value })
-                      } else {
-                        setFormData({ ...formData, from_account_id: e.target.value })
-                      }
-                    }}
-                    className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm appearance-none [&>option]:bg-[#151518] [&>option]:text-white"
-                  >
-                    <option value="">Select Account</option>
-                    {accounts.map(acc => (
-                      <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance)})</option>
-                    ))}
-                  </select>
-                </div>
-
-                {activeType === 'transfer' && (
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-1">To Account</label>
-                    <select
-                      required
-                      value={formData.to_account_id}
-                      onChange={(e) => setFormData({ ...formData, to_account_id: e.target.value })}
-                      className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm appearance-none [&>option]:bg-[#151518] [&>option]:text-white"
-                    >
-                      <option value="">Select Account</option>
-                      {accounts.map(acc => (
-                        <option key={acc.id} value={acc.id}>{acc.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {activeType !== 'transfer' && (
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-1">Category</label>
-                    <select
-                      required
-                      value={formData.category_id}
-                      onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                      className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm appearance-none [&>option]:bg-[#151518] [&>option]:text-white"
-                    >
-                      <option value="">Select Category</option>
-                      {categories.filter(c => c.type === activeType).map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div className="space-y-3">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-1">Note</label>
-                  <textarea
-                    value={formData.note}
-                    onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                    placeholder="What was this for?"
-                    className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 h-32 resize-none text-sm"
-                  />
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-4 pt-4 pb-8 lg:pb-0">
-                  <button
-                    type="button"
-                    onClick={() => { setShowAddModal(false); setEditingId(null); }}
-                    className="order-2 sm:order-1 flex-1 px-6 py-5 rounded-2xl border border-white/5 text-zinc-400 font-bold hover:bg-white/5 transition-all text-sm uppercase tracking-widest"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className={cn(
-                      "order-1 sm:order-2 flex-1 px-6 py-5 rounded-2xl text-white font-bold transition-all shadow-xl text-sm uppercase tracking-widest",
-                      activeType === 'income' ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20' :
-                        activeType === 'expense' ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20' :
-                          'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20'
-                    )}
-                  >
-                    {editingId ? 'Save Changes' : 'Save Transaction'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+              >
+                {type}
+              </button>
+            ))}
           </div>
         )}
-      </AnimatePresence>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[0.2em] ml-1">Amount</label>
+              <div className="relative">
+                <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary)]" />
+                <input
+                  required
+                  type="number"
+                  step="0.01"
+                  value={formData.amount}
+                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  placeholder="0.00"
+                  className="w-full bg-[var(--surface-2)] border border-[var(--border-2)] rounded-2xl pl-12 pr-4 py-3.5 text-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)] transition-all"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[0.2em] ml-1">Date</label>
+              <input
+                required
+                type="datetime-local"
+                value={formData.date}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                className="w-full bg-[var(--surface-2)] border border-[var(--border-2)] rounded-2xl px-4 py-3.5 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)] transition-all text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[0.2em] ml-1">
+              {activeType === 'income' ? 'To Account' : 'From Account'}
+            </label>
+            <select
+              required
+              value={activeType === 'income' ? formData.to_account_id : formData.from_account_id}
+              onChange={(e) => {
+                if (activeType === 'income') {
+                  setFormData({ ...formData, to_account_id: e.target.value })
+                } else {
+                  setFormData({ ...formData, from_account_id: e.target.value })
+                }
+              }}
+              className={fieldClasses + ' py-3.5'}
+            >
+              <option value="">Select Account</option>
+              {accounts.map(acc => (
+                <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance)})</option>
+              ))}
+            </select>
+          </div>
+
+          {activeType === 'transfer' && (
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[0.2em] ml-1">To Account</label>
+              <select
+                required
+                value={formData.to_account_id}
+                onChange={(e) => setFormData({ ...formData, to_account_id: e.target.value })}
+                className={fieldClasses + ' py-3.5'}
+              >
+                <option value="">Select Account</option>
+                {accounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>{acc.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {activeType !== 'transfer' && (
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[0.2em] ml-1">Category</label>
+              <select
+                required
+                value={formData.category_id}
+                onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                className={fieldClasses + ' py-3.5'}
+              >
+                <option value="">Select Category</option>
+                {categories.filter(c => c.type === activeType).map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[0.2em] ml-1">Note</label>
+            <textarea
+              value={formData.note}
+              onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+              placeholder="What was this for?"
+              className="w-full bg-[var(--surface-2)] border border-[var(--border-2)] rounded-2xl px-4 py-3.5 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-ring)] h-28 resize-none text-sm"
+            />
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => { setShowAddModal(false); setEditingId(null); }}
+              className="order-2 sm:order-1 flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant={activeType === 'income' ? 'primary' : activeType === 'expense' ? 'danger' : 'primary'}
+              className={cn(
+                "order-1 sm:order-2 flex-1",
+                activeType === 'transfer' && 'bg-blue-500 text-white hover:bg-blue-600 shadow-[0_8px_24px_-8px_rgba(59,130,246,0.4)]'
+              )}
+            >
+              {editingId ? 'Save Changes' : 'Save Transaction'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

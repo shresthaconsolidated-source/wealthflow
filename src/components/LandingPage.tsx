@@ -1,14 +1,12 @@
 import React from 'react';
-import { 
-  Wallet, 
-  Shield, 
-  ArrowRight, 
-  Flame, 
-  Activity, 
-  TrendingUp, 
+import {
+  Wallet,
+  Shield,
+  Flame,
+  Activity,
+  TrendingUp,
   Lock,
-  Smartphone,
-  CheckCircle2
+  CheckCircle2,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { GoogleLogin } from '@react-oauth/google';
@@ -17,287 +15,249 @@ interface Props {
   onLoginSuccess: (credential: string) => void;
 }
 
+const ease = [0.16, 1, 0.3, 1] as const;
+
+const features = [
+  {
+    icon: Flame,
+    accent: 'text-[var(--gold)]',
+    iconBg: 'bg-[var(--gold-soft)]',
+    title: 'A real FIRE number',
+    description:
+      "Model your path to financial independence with inflation, raises, and one-off events accounted for — not a rough back-of-napkin guess.",
+  },
+  {
+    icon: TrendingUp,
+    accent: 'text-[var(--accent)]',
+    iconBg: 'bg-[var(--accent-soft)]',
+    title: 'One net worth, everywhere',
+    description:
+      'Every account and asset rolled into a single, always-current picture of what you actually own.',
+  },
+  {
+    icon: Activity,
+    accent: 'text-blue-400',
+    iconBg: 'bg-blue-400/10',
+    title: 'Spending that explains itself',
+    description:
+      'Recurring bills detected automatically, trends surfaced before you have to go looking for them.',
+  },
+];
+
 export default function LandingPage({ onLoginSuccess }: Props) {
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-white selection:bg-emerald-500/30 overflow-x-hidden">
-      {/* Dynamic Background */}
+    <div className="min-h-screen bg-[var(--surface-0)] text-[var(--text-primary)] selection:bg-[var(--accent)]/30 overflow-x-hidden bg-grain">
+      {/* Ambient glow — one color, kept quiet */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-emerald-500/10 blur-[150px] rounded-full"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-500/5 blur-[150px] rounded-full"></div>
-        <div className="absolute top-[20%] right-[10%] w-[30%] h-[30%] bg-orange-500/5 blur-[120px] rounded-full"></div>
+        <div className="absolute top-[-15%] left-[-10%] w-[55%] h-[55%] bg-[var(--accent)]/[0.07] blur-[160px] rounded-full" />
+        <div className="absolute bottom-[-15%] right-[-10%] w-[45%] h-[45%] bg-[var(--gold)]/[0.04] blur-[160px] rounded-full" />
       </div>
 
-      {/* Navigation */}
-      <nav className="relative z-50 border-b border-white/5 bg-[#0A0A0B]/80 backdrop-blur-md sticky top-0">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-              <Wallet className="text-white w-6 h-6" />
+      <nav className="relative z-50 border-b border-[var(--border-1)] bg-[var(--surface-0)]/80 backdrop-blur-md sticky top-0">
+        <div className="max-w-6xl mx-auto px-6 h-18 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-strong)] flex items-center justify-center shadow-[0_8px_20px_-6px_var(--accent-ring)]">
+              <Wallet className="text-[#04140e] w-[18px] h-[18px]" strokeWidth={2.5} />
             </div>
-            <span className="text-xl font-black tracking-tighter uppercase text-white">WealthFlow</span>
+            <span className="text-lg font-bold tracking-tight">WealthFlow</span>
           </div>
-          
-          <div className="flex items-center gap-8">
+
+          <div className="flex items-center gap-6">
             <div className="hidden md:flex items-center gap-6">
-              <a href="#features" className="text-sm font-bold text-zinc-400 hover:text-white transition-colors">Features</a>
-              <a href="#security" className="text-sm font-bold text-zinc-400 hover:text-white transition-colors">Security</a>
+              <a href="#features" className="text-sm font-medium text-[var(--text-secondary)] hover:text-white transition-colors">Features</a>
+              <a href="#security" className="text-sm font-medium text-[var(--text-secondary)] hover:text-white transition-colors">Privacy</a>
             </div>
-            <div className="relative group">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full blur opacity-30 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
-              <div className="relative flex items-center bg-[#0A0A0B] rounded-full scale-90 sm:scale-100">
-                <GoogleLogin
-                  onSuccess={(res) => res.credential && onLoginSuccess(res.credential)}
-                  onError={() => console.log('Login Failed')}
-                  theme="filled_black"
-                  shape="pill"
-                  text="signin_with"
-                />
-              </div>
+            <div className="scale-90 sm:scale-100 rounded-full overflow-hidden">
+              <GoogleLogin
+                onSuccess={(res) => res.credential && onLoginSuccess(res.credential)}
+                onError={() => console.log('Login Failed')}
+                theme="filled_black"
+                shape="pill"
+                text="signin_with"
+              />
             </div>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative z-10 pt-16 md:pt-24 pb-32">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 md:gap-24 items-center">
-            <div className="space-y-8 md:space-y-12">
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full"
-              >
-                <Zap className="w-4 h-4 text-emerald-400" />
-                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Version 2.0 is Live</span>
-              </motion.div>
-              
-              <div className="space-y-6">
-                <motion.h1 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  className="text-5xl sm:text-6xl md:text-[5rem] lg:text-[6rem] font-black tracking-tighter leading-[0.9] text-white"
-                >
-                  MASTER YOUR <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-emerald-500 to-blue-600">FREEDOM.</span>
-                </motion.h1 >
-                
-                <motion.p 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="text-lg md:text-xl text-zinc-500 max-w-lg leading-relaxed font-medium"
-                >
-                  A high-precision private wealth simulator designed for those who value privacy, intelligence, and beautiful design.
-                </motion.p>
-              </div>
-              
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
+      <section className="relative z-10 pt-20 md:pt-28 pb-28">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-20 items-center">
+            <div className="space-y-8">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="flex flex-col sm:flex-row items-center gap-6 pt-4"
+                transition={{ ease }}
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/[0.04] border border-[var(--border-2)] rounded-full"
               >
-                <div className="relative group">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-blue-600 rounded-full blur-md opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200"></div>
-                  <div className="relative scale-110">
-                    <GoogleLogin
-                      onSuccess={(res) => res.credential && onLoginSuccess(res.credential)}
-                      onError={() => console.log('Login Failed')}
-                      theme="filled_black"
-                      shape="pill"
-                      text="continue_with"
-                    />
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2 px-6 py-3 text-zinc-500 text-[10px] font-black uppercase tracking-widest border border-white/5 rounded-full bg-white/[0.02]">
-                  <Shield className="w-4 h-4 text-emerald-500" />
-                  Enterprise Grade Privacy
-                </div>
+                <Lock className="w-3.5 h-3.5 text-[var(--accent)]" />
+                <span className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Built for one — just you</span>
               </motion.div>
 
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="flex items-center gap-8 md:gap-12 pt-10"
+              <div className="space-y-5">
+                <motion.h1
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.05, ease }}
+                  className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.05]"
+                >
+                  See your whole financial
+                  <br />
+                  life in <span className="text-[var(--accent)]">one clear view.</span>
+                </motion.h1>
+
+                <motion.p
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.12, ease }}
+                  className="text-lg text-[var(--text-tertiary)] max-w-lg leading-relaxed"
+                >
+                  A private net worth tracker and FIRE calculator that stays out of your way — no ads,
+                  no upsells, no one else looking at your numbers.
+                </motion.p>
+              </div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, ease }}
+                className="flex flex-col sm:flex-row items-start sm:items-center gap-5 pt-2"
               >
-                <div className="space-y-1">
-                  <p className="text-3xl font-black text-white">$0.00</p>
-                  <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Setup Costs</p>
+                <div className="rounded-full overflow-hidden scale-105">
+                  <GoogleLogin
+                    onSuccess={(res) => res.credential && onLoginSuccess(res.credential)}
+                    onError={() => console.log('Login Failed')}
+                    theme="filled_black"
+                    shape="pill"
+                    text="continue_with"
+                  />
                 </div>
-                <div className="w-px h-10 bg-white/10"></div>
-                <div className="space-y-1">
-                  <p className="text-3xl font-black text-white">100%</p>
-                  <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Data Privacy</p>
-                </div>
-                <div className="w-px h-10 bg-white/10"></div>
-                <div className="space-y-1">
-                  <p className="text-3xl font-black text-white">Secured</p>
-                  <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">By Google</p>
+
+                <div className="flex items-center gap-2 text-[var(--text-tertiary)] text-xs font-medium">
+                  <Shield className="w-4 h-4 text-[var(--accent)]" />
+                  Signed in with Google — nothing else to set up
                 </div>
               </motion.div>
             </div>
 
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, rotate: 5 }}
-              animate={{ opacity: 1, scale: 1, rotate: 0 }}
-              transition={{ delay: 0.2, duration: 1, ease: "easeOut" }}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.15, duration: 0.9, ease }}
               className="relative"
             >
-              {/* Premium Mockup Container */}
-              <div className="relative z-20 bg-gradient-to-br from-white/10 to-transparent p-[1px] rounded-[40px] shadow-2xl backdrop-blur-3xl overflow-hidden group">
-                <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 via-transparent to-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-1000"></div>
-                <img 
-                  src="/dashboard_mockup.png" 
-                  alt="WealthFlow Dashboard" 
-                  className="rounded-[39px] w-full h-auto shadow-2xl transition-transform duration-1000 group-hover:scale-105"
+              <div className="relative z-20 bg-gradient-to-br from-white/10 to-transparent p-px rounded-[32px] shadow-2xl overflow-hidden">
+                <img
+                  src="/dashboard_mockup.png"
+                  alt="WealthFlow dashboard"
+                  className="rounded-[31px] w-full h-auto"
                 />
               </div>
-              
-              {/* Decorative elements behind image */}
-              <div className="absolute -top-20 -right-20 w-[300px] h-[300px] bg-emerald-500/20 blur-[100px] rounded-full animate-pulse -z-10"></div>
-              <div className="absolute -bottom-20 -left-20 w-[300px] h-[300px] bg-blue-500/20 blur-[100px] rounded-full animate-pulse -z-10"></div>
+              <div className="absolute -top-16 -right-16 w-[260px] h-[260px] bg-[var(--accent)]/10 blur-[110px] rounded-full -z-10" />
             </motion.div>
           </div>
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section id="features" className="py-32 relative z-10 bg-white/[0.01]">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center space-y-4 mb-20">
-            <h2 className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.3em]">Advanced Capabilities</h2>
-            <h3 className="text-4xl md:text-5xl font-black text-white">Intelligent by design.</h3>
+      <section id="features" className="py-24 relative z-10 border-y border-[var(--border-1)] bg-white/[0.01]">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="mb-16 max-w-xl">
+            <h2 className="text-xs font-bold text-[var(--accent)] uppercase tracking-[0.2em] mb-3">What it actually does</h2>
+            <h3 className="text-3xl md:text-4xl font-bold tracking-tight">Three things, done properly.</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="group p-10 bg-[#151518] border border-white/5 rounded-[40px] hover:border-emerald-500/20 transition-all duration-500">
-              <div className="w-14 h-14 bg-orange-500/10 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
-                <Flame className="w-7 h-7 text-orange-500" />
-              </div>
-              <h4 className="text-2xl font-bold mb-4">Precision FIRE Path</h4>
-              <p className="text-zinc-500 leading-relaxed">Simulate your retirement with extreme accuracy. Accounts for inflation, annual step-ups, and one-time bulk events.</p>
-            </div>
-
-            <div className="group p-10 bg-[#151518] border border-white/5 rounded-[40px] hover:border-blue-500/20 transition-all duration-500">
-              <div className="w-14 h-14 bg-blue-500/10 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
-                <TrendingUp className="w-7 h-7 text-blue-500" />
-              </div>
-              <h4 className="text-2xl font-bold mb-4">Smart Aggregation</h4>
-              <p className="text-zinc-500 leading-relaxed">Unified view of your net worth across multiple accounts and asset classes with real-time tracking.</p>
-            </div>
-
-            <div className="group p-10 bg-[#151518] border border-white/5 rounded-[40px] hover:border-emerald-500/20 transition-all duration-500">
-              <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
-                <Activity className="w-7 h-7 text-emerald-500" />
-              </div>
-              <h4 className="text-2xl font-bold mb-4">Deep Analytics</h4>
-              <p className="text-zinc-500 leading-relaxed">Understand your spending habits and savings trends with intelligent charts and automated insights.</p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {features.map((f, i) => (
+              <motion.div
+                key={f.title}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-80px' }}
+                transition={{ delay: i * 0.08, ease }}
+                className="group p-8 bg-[var(--surface-1)] border border-[var(--border-1)] rounded-[28px] hover:border-[var(--border-2)] transition-all duration-300 hover:-translate-y-1"
+              >
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-7 ${f.iconBg}`}>
+                  <f.icon className={`w-6 h-6 ${f.accent}`} />
+                </div>
+                <h4 className="text-xl font-bold mb-3">{f.title}</h4>
+                <p className="text-[var(--text-tertiary)] leading-relaxed text-sm">{f.description}</p>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Security Section */}
-      <section id="security" className="py-32 relative z-10">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="bg-gradient-to-br from-[#151518] to-[#0A0A0B] border border-white/5 rounded-[60px] p-8 md:p-20 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-20 opacity-5">
-              <Shield className="w-96 h-96 text-white" />
+      <section id="security" className="py-24 relative z-10">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="bg-[var(--surface-1)] border border-[var(--border-1)] rounded-[40px] p-8 md:p-16 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-16 opacity-[0.03] pointer-events-none">
+              <Shield className="w-72 h-72" />
             </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center relative z-10">
-              <div className="space-y-8">
-                <h3 className="text-4xl md:text-6xl font-black text-white leading-tight">Your data. <br />Your privacy.</h3>
-                <p className="text-xl text-zinc-500 leading-relaxed">
-                  WealthFlow is built on top of enterprise-grade security. We use Google OAuth for password-less authentication and never store your raw credentials.
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-14 items-center relative z-10">
+              <div className="space-y-7">
+                <h3 className="text-3xl md:text-5xl font-bold leading-tight tracking-tight">
+                  Your data.
+                  <br />
+                  Your privacy.
+                </h3>
+                <p className="text-lg text-[var(--text-tertiary)] leading-relaxed">
+                  WealthFlow authenticates through Google and never asks for or stores a password. Your
+                  financial data belongs to you — it isn't sold, shared, or used for anything but showing
+                  it back to you.
                 </p>
-                <ul className="space-y-4">
+                <ul className="space-y-3.5">
                   {[
-                    "Zero-knowledge architecture",
-                    "Encrypted database syncing",
-                    "Google-secured authentication",
-                    "Private local state management"
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-center gap-4 text-white font-bold">
-                      <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    'Password-less Google authentication',
+                    'No ads, no data brokers, no analytics resale',
+                    'Built and run for a single household',
+                  ].map((item) => (
+                    <li key={item} className="flex items-center gap-3 font-medium text-sm">
+                      <div className="w-5 h-5 rounded-full bg-[var(--accent-soft)] flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="w-3 h-3 text-[var(--accent)]" />
                       </div>
                       {item}
                     </li>
                   ))}
                 </ul>
               </div>
-              
-              <div className="bg-white/5 border border-white/10 rounded-[40px] p-10 space-y-8 backdrop-blur-xl">
-                 <div className="w-16 h-16 bg-emerald-500/10 rounded-3xl flex items-center justify-center">
-                   <Lock className="w-8 h-8 text-emerald-400" />
-                 </div>
-                 <div className="space-y-4">
-                   <h4 className="text-2xl font-bold">Private & Personal</h4>
-                   <p className="text-zinc-400 leading-relaxed">
-                     WealthFlow is a private tool designed for individuals. We don't sell your data to banks or advertisers. Your financial journey is yours alone.
-                   </p>
-                 </div>
-                 <div className="pt-4">
-                    <div className="inline-block scale-110">
-                      <GoogleLogin
-                        onSuccess={(res) => res.credential && onLoginSuccess(res.credential)}
-                        onError={() => console.log('Login Failed')}
-                        theme="filled_black"
-                        shape="pill"
-                      />
-                    </div>
-                 </div>
+
+              <div className="bg-[var(--surface-2)] border border-[var(--border-2)] rounded-[28px] p-9 space-y-7">
+                <div className="w-14 h-14 bg-[var(--accent-soft)] rounded-2xl flex items-center justify-center">
+                  <Lock className="w-7 h-7 text-[var(--accent)]" />
+                </div>
+                <div className="space-y-3">
+                  <h4 className="text-xl font-bold">Private by default</h4>
+                  <p className="text-[var(--text-tertiary)] leading-relaxed text-sm">
+                    This isn't a product with a growth team. It's a tool for tracking one person's path
+                    to financial independence — nothing about your data is monetized.
+                  </p>
+                </div>
+                <div className="pt-1 rounded-full overflow-hidden inline-block">
+                  <GoogleLogin
+                    onSuccess={(res) => res.credential && onLoginSuccess(res.credential)}
+                    onError={() => console.log('Login Failed')}
+                    theme="filled_black"
+                    shape="pill"
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-20 border-t border-white/5 relative z-10">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-10">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
-              <Wallet className="text-white w-5 h-5" />
+      <footer className="py-14 border-t border-[var(--border-1)] relative z-10">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-[var(--accent)] flex items-center justify-center">
+              <Wallet className="text-[#04140e] w-4 h-4" strokeWidth={2.5} />
             </div>
-            <span className="text-lg font-black tracking-tighter uppercase">WealthFlow</span>
+            <span className="text-sm font-bold tracking-tight">WealthFlow</span>
           </div>
-          
-          <div className="text-zinc-600 text-sm font-medium">
-            © 2026 WealthFlow. Built for the modern wealth manager.
-          </div>
-          
-          <div className="flex items-center gap-6">
-             <Smartphone className="w-5 h-5 text-zinc-500" />
-             <span className="text-zinc-500 text-sm font-bold uppercase tracking-widest">Mobile Optimized</span>
-          </div>
+          <div className="text-[var(--text-tertiary)] text-sm">© 2026 WealthFlow — a private wealth tracker.</div>
         </div>
       </footer>
     </div>
-  );
-}
-
-// Re-using the Lucide Zap icon since I added it to the imports
-function Zap(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 14.71 13.63 2 11 10.29h9L10.37 23 13 14.71H4z" />
-    </svg>
   );
 }
