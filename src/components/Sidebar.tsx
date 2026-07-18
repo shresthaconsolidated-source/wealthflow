@@ -7,11 +7,16 @@ import {
   LogOut,
   Wallet,
   Heart,
-  MessageCircle
+  MessageCircle,
+  Target,
+  Eye,
+  EyeOff,
+  Command
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { usePrivacy } from '@/src/contexts/PrivacyContext';
 
 interface SidebarProps {
   activeTab: string;
@@ -22,6 +27,7 @@ const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight },
   { id: 'analysis', label: 'Analysis', icon: TrendingUp },
+  { id: 'plan', label: 'Budgets & Goals', icon: Target },
   { id: 'donations', label: 'Donations', icon: Heart },
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'contact', label: 'Contact', icon: MessageCircle },
@@ -29,6 +35,7 @@ const menuItems = [
 
 export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const { logout, user } = useAuth();
+  const { privacy, togglePrivacy } = usePrivacy();
 
   return (
     <div className="hidden lg:flex w-64 h-screen bg-[var(--surface-0)] border-r border-[var(--border-1)] flex-col fixed left-0 top-0 z-50">
@@ -77,6 +84,29 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
       </div>
 
       <div className="mt-auto p-5 border-t border-[var(--border-1)]">
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={togglePrivacy}
+            title={privacy ? 'Show amounts' : 'Hide amounts'}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-xs font-semibold transition-all',
+              privacy
+                ? 'border-[var(--accent)]/30 bg-[var(--accent-soft)] text-[var(--accent)]'
+                : 'border-[var(--border-1)] text-[var(--text-tertiary)] hover:text-white hover:bg-white/5'
+            )}
+          >
+            {privacy ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            {privacy ? 'Private' : 'Privacy'}
+          </button>
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('wf:open-palette'))}
+            title="Command palette (⌘K)"
+            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border border-[var(--border-1)] text-xs font-semibold text-[var(--text-tertiary)] hover:text-white hover:bg-white/5 transition-all"
+          >
+            <Command className="w-3.5 h-3.5" />
+            ⌘K
+          </button>
+        </div>
         <div className="flex items-center gap-3 mb-4 px-2">
           <div className="w-9 h-9 rounded-full bg-[var(--surface-2)] border border-[var(--border-2)] overflow-hidden shrink-0">
             {user?.picture ? (

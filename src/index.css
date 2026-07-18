@@ -68,6 +68,29 @@
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
   }
+
+  /* Privacy mode: blur every money figure until toggled off (shoulder-surfing guard) */
+  body.privacy .tnum {
+    filter: blur(7px);
+    transition: filter 0.25s ease;
+    user-select: none;
+  }
+  .tnum {
+    transition: filter 0.25s ease;
+  }
+
+  /* Charts render money as SVG text/tooltips without .tnum — blur those too */
+  body.privacy .recharts-wrapper text,
+  body.privacy .recharts-tooltip-wrapper {
+    filter: blur(6px);
+  }
+
+  /* Form fields stay readable while editing — privacy guards display, not input */
+  body.privacy input.tnum,
+  body.privacy textarea.tnum {
+    filter: none;
+    user-select: auto;
+  }
 }
 
 @layer utilities {

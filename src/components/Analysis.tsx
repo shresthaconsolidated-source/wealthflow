@@ -26,6 +26,7 @@ import { computeHealthScore } from '@/src/lib/healthScoreEngine';
 import { detectRecurring } from '@/src/lib/recurringDetectionEngine';
 import { categoryBreakdown, computeNetWorthCAGR, computePassiveMetrics } from '@/src/lib/breakdownEngine';
 import { Card, PageHeader, EmptyState, Badge } from '@/src/components/ui';
+import SpendingHeatmap from './SpendingHeatmap';
 
 type Tab = 'insights' | 'breakdown' | 'forecast' | 'health' | 'recurring' | 'fire';
 type TimeRange = 'monthly' | 'quarterly' | 'yearly' | 'all';
@@ -315,6 +316,9 @@ export default function Analysis() {
                 />
               </Card>
             </div>
+
+            {/* Daily spending heatmap — trailing 6 months regardless of period selector */}
+            <SpendingHeatmap transactions={allTransactions} />
           </div>
         )}
 

@@ -19,7 +19,7 @@ import { formatCurrency, cn } from '@/src/lib/utils';
 import { useApi } from '@/src/hooks/useApi';
 
 import SmartTransactionInput from '@/src/components/SmartTransactionInput';
-import { Card, Button, PageHeader, Modal } from '@/src/components/ui';
+import { Card, Button, PageHeader, Modal, useToast, useConfirm } from '@/src/components/ui';
 
 const getLocalDatetimePattern = (dateStr?: string | null) => {
   if (!dateStr) {
@@ -104,6 +104,8 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
   }, []);
 
   const { fetchWithAuth } = useApi();
+  const { toast } = useToast();
+  const confirm = useConfirm();
 
   const fetchTransactions = () => {
     fetchWithAuth('/api/transactions')
@@ -189,10 +191,13 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
   const handleBulkDelete = async () => {
     if (!selectedIds.length || isDeletingBulk) return;
 
-    // Safety check with browser confirm since this is a destructive action
-    if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} transactions? This cannot be undone.`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: `Delete ${selectedIds.length} transaction${selectedIds.length > 1 ? 's' : ''}?`,
+      description: 'This cannot be undone. Account balances will be adjusted.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
 
     setIsDeletingBulk(true);
     setOpenMenuId(null);
@@ -203,11 +208,13 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
         selectedIds.map(id => fetchWithAuth(`/api/transactions/${id}`, { method: 'DELETE' }))
       );
 
+      const n = selectedIds.length;
       setSelectedIds([]); // Clear selection on success
       fetchTransactions(); // Refresh the list
+      toast(`${n} transaction${n > 1 ? 's' : ''} deleted`, { type: 'success' });
     } catch (err) {
       console.error('Bulk delete failed', err);
-      alert('Failed to delete some transactions. Please try again.');
+      toast('Failed to delete some transactions. Please try again.', { type: 'error' });
     } finally {
       setIsDeletingBulk(false);
     }
@@ -321,13 +328,22 @@ export default function Transactions({ setActiveTab }: TransactionsProps) {
 
   const handleDeleteTransaction = async (id: string) => {
     setOpenMenuId(null);
+    const ok = await confirm({
+      title: 'Delete this transaction?',
+      description: 'This cannot be undone. Account balances will be adjusted.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await fetchWithAuth(`/api/transactions/${id}`, { method: 'DELETE' });
       // Deselect if it was selected during a manual standard delete
       setSelectedIds(prev => prev.filter(i => i !== id));
       fetchTransactions();
+      toast('Transaction deleted', { type: 'success' });
     } catch (err) {
       console.error('Delete failed', err);
+      toast('Failed to delete transaction', { type: 'error' });
     }
   };
 

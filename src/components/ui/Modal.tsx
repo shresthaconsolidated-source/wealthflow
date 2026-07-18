@@ -19,6 +19,28 @@ interface ModalProps {
  * fights motion's own transform-based enter/exit animation.
  */
 export default function Modal({ open, onClose, title, description, children, className, footer }: ModalProps) {
+  const panelRef = React.useRef<HTMLDivElement>(null);
+
+  // Escape closes; focus moves into the dialog on open and back on close.
+  React.useEffect(() => {
+    if (!open) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    // Only steal focus if nothing inside the dialog (e.g. an autoFocus input) has claimed it
+    requestAnimationFrame(() => {
+      if (panelRef.current && !panelRef.current.contains(document.activeElement)) {
+        panelRef.current.focus();
+      }
+    });
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      previouslyFocused?.focus?.();
+    };
+  }, [open, onClose]);
+
   return (
     <AnimatePresence>
       {open && (
@@ -32,11 +54,16 @@ export default function Modal({ open, onClose, title, description, children, cla
             className="absolute inset-0 bg-black/70 backdrop-blur-md"
           />
           <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            tabIndex={-1}
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 40 }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             className={cn(
+              'focus:outline-none',
               'relative z-10 w-full lg:max-w-lg max-h-[88vh] flex flex-col',
               'bg-[var(--surface-2)] border border-[var(--border-2)] shadow-2xl',
               'rounded-t-[32px] lg:rounded-[32px] p-6 lg:p-8',
