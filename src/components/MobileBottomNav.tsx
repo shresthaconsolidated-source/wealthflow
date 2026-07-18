@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, ArrowLeftRight, PieChart, MoreHorizontal, Heart, MessageCircle, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, ArrowLeftRight, PieChart, MoreHorizontal, Heart, MessageCircle, Settings, LogOut, Target } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -17,6 +17,7 @@ const primaryItems = [
 ];
 
 const moreItems = [
+  { id: 'plan', label: 'Budgets & Goals', icon: Target },
   { id: 'donations', label: 'Donations', icon: Heart },
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'contact', label: 'Contact', icon: MessageCircle },

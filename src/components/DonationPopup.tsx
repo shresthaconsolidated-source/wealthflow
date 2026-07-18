@@ -53,7 +53,7 @@ export default function DonationPopup({ isOpen, onClose, onDonate }: DonationPop
               </div>
 
               <p className="text-[10px] text-[var(--text-tertiary)] font-bold uppercase tracking-widest pt-2">
-                This reminder appears once per day
+                This reminder appears at most once a week
               </p>
             </div>
           </motion.div>

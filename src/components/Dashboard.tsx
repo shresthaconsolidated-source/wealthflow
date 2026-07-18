@@ -34,6 +34,48 @@ import { computeForecast } from '@/src/lib/forecastEngine';
 import { computeHealthScore } from '@/src/lib/healthScoreEngine';
 import { Card, Button, StatCard, EmptyState, PageHeader, Modal, Select } from '@/src/components/ui';
 import { DashboardSkeleton } from '@/src/components/ui/Skeleton';
+import { BudgetSummaryCard } from './Budgets';
+import { GoalSummaryCard } from './Goals';
+import { useCountUp } from '@/src/hooks/useCountUp';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
+
+function AnimatedCurrency({ value }: { value: number }) {
+  const animated = useCountUp(value);
+  return <>{formatCurrency(animated)}</>;
+}
+
+function OnboardingChecklist({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
+  const steps = [
+    { label: 'Add your first account', hint: 'Bank, cash or asset — this is where your balances live.', tab: 'settings' },
+    { label: 'Record a transaction', hint: 'Try the smart input: type "lunch 12" and hit enter.', tab: 'transactions' },
+    { label: 'Set a budget or goal', hint: 'Give your money a direction.', tab: 'plan' },
+  ];
+  return (
+    <Card level={1} padding="lg" className="border-[var(--accent)]/20">
+      <div className="flex items-center gap-2 mb-1">
+        <CheckCircle2 className="w-4 h-4 text-[var(--accent)]" />
+        <p className="text-[var(--accent)] text-[11px] font-bold uppercase tracking-widest">Getting started</p>
+      </div>
+      <h3 className="text-lg font-bold text-[var(--text-primary)] mb-5">Set up WealthFlow in 3 steps</h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {steps.map((s, i) => (
+          <button
+            key={s.tab}
+            onClick={() => setActiveTab(s.tab)}
+            className="text-left p-4 rounded-2xl bg-white/[0.03] border border-[var(--border-1)] hover:border-[var(--accent)]/30 hover:bg-white/[0.05] transition-all group"
+          >
+            <p className="text-[var(--text-tertiary)] text-[10px] font-bold uppercase tracking-widest mb-1.5">Step {i + 1}</p>
+            <p className="text-[var(--text-primary)] text-sm font-bold flex items-center gap-1.5">
+              {s.label}
+              <ArrowRight className="w-3.5 h-3.5 text-[var(--text-tertiary)] group-hover:text-[var(--accent)] group-hover:translate-x-0.5 transition-all" />
+            </p>
+            <p className="text-[var(--text-tertiary)] text-xs mt-1">{s.hint}</p>
+          </button>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
 const COLORS = ['#2ee6a6', '#3b82f6', '#d4b76a', '#f2554e', '#8b5cf6'];
 
@@ -155,19 +197,28 @@ export default function Dashboard({ setActiveTab }: DashboardProps) {
         }
       />
 
+      {/* First-run checklist */}
+      {accounts.length === 0 && <OnboardingChecklist setActiveTab={setActiveTab} />}
+
       {/* KPIs */}
       <div className="flex lg:grid lg:grid-cols-4 gap-4 overflow-x-auto lg:overflow-x-visible no-scrollbar -mx-4 px-4 lg:mx-0 lg:px-0 pb-1 lg:pb-0">
         {kpis.map((kpi, i) => (
           <StatCard
             key={kpi.label}
             label={kpi.label}
-            value={typeof kpi.value === 'number' ? formatCurrency(kpi.value) : (kpi.value || '0')}
+            value={typeof kpi.value === 'number' ? <AnimatedCurrency value={kpi.value} /> : (kpi.value || '0')}
             icon={kpi.icon}
             trend={kpi.trend}
             positive={kpi.positive}
             delay={i * 0.06}
           />
         ))}
+      </div>
+
+      {/* Budgets & Goals at a glance (render nothing until configured) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-8 empty:hidden">
+        <BudgetSummaryCard limit={3} />
+        <GoalSummaryCard />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-8">

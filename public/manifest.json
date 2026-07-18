@@ -1,14 +1,20 @@
 {
   "name": "WealthFlow",
   "short_name": "WealthFlow",
-  "description": "Experience the next generation of private wealth management.",
+  "description": "Private net worth tracker and FIRE calculator — every account in one clear view, no ads, no data resale.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0A0A0B",
-  "theme_color": "#0A0A0B",
+  "background_color": "#08090b",
+  "theme_color": "#08090b",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/2631/2631436.png",
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
