@@ -72,6 +72,41 @@ export function saveBudgets(userId: string, budgets: Budget[]): void {
     }
 }
 
+/**
+ * Server persistence. The `user_settings.budgets` column is the authoritative
+ * copy so budgets follow the account across devices; localStorage above is kept
+ * as an offline cache for instant paint and as a fallback when the API is down.
+ *
+ * The fetcher is passed in rather than imported so this module stays free of
+ * React and of any transport of its own.
+ */
+type Fetcher = (url: string, options?: RequestInit) => Promise<Response>;
+
+const SETTINGS_URL = '/api/user/settings';
+
+/** Reads the account copy and refreshes the local cache. Throws if the request fails. */
+export async function fetchBudgets(fetchWithAuth: Fetcher, userId: string): Promise<Budget[]> {
+    const res = await fetchWithAuth(SETTINGS_URL);
+    const data = await res.json();
+    const budgets = Array.isArray(data?.budgets) ? data.budgets.filter(isValidBudget) : [];
+    saveBudgets(userId, budgets);
+    return budgets;
+}
+
+/**
+ * Writes the account copy. The local cache is updated first so an edit is never
+ * lost to a failed request — the caller surfaces the error and the cache is
+ * reconciled on the next successful fetch.
+ */
+export async function pushBudgets(fetchWithAuth: Fetcher, userId: string, budgets: Budget[]): Promise<void> {
+    const clean = budgets.filter(isValidBudget);
+    saveBudgets(userId, clean);
+    await fetchWithAuth(SETTINGS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ budgets: clean }),
+    });
+}
+
 function stateFor(spent: number, limit: number, pct: number): BudgetState {
     if (spent > limit) return 'over';
     if (pct >= WARNING_THRESHOLD) return 'warning';

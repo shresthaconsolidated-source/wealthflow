@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Target, SlidersHorizontal, PiggyBank, HardDrive } from 'lucide-react';
-import { Card, Button, Badge, EmptyState, Modal, Skeleton } from '@/src/components/ui';
+import { Target, SlidersHorizontal, PiggyBank, Cloud } from 'lucide-react';
+import { Card, Button, Badge, EmptyState, Modal, Skeleton, useToast } from '@/src/components/ui';
 import { inputBaseClasses } from '@/src/components/ui/Input';
 import { cn, formatCurrency, getCurrencySymbol } from '@/src/lib/utils';
 import { useApi } from '@/src/hooks/useApi';
@@ -10,7 +10,8 @@ import {
   type Budget,
   type BudgetStatus,
   loadBudgets,
-  saveBudgets,
+  fetchBudgets,
+  pushBudgets,
   computeBudgetStatus,
 } from '@/src/lib/budgetEngine';
 
@@ -64,9 +65,36 @@ function useBudgetData() {
     return () => document.removeEventListener('visibilitychange', refresh);
   }, []);
 
+  // Paint from the local cache immediately, then reconcile with the account
+  // copy. If the account has none but this device does, the device copy is
+  // adopted and pushed up — that's the one-time migration off device-only
+  // storage, and it must never be replaced by the server's empty default.
   useEffect(() => {
-    if (user) setBudgets(loadBudgets(user.id));
-  }, [user?.id]);
+    if (!user) return;
+    const userId = user.id;
+    let cancelled = false;
+
+    const cached = loadBudgets(userId);
+    setBudgets(cached);
+
+    (async () => {
+      try {
+        const remote = await fetchBudgets(fetchWithAuth, userId);
+        if (cancelled) return;
+        if (remote.length === 0 && cached.length > 0) {
+          await pushBudgets(fetchWithAuth, userId, cached);
+          if (!cancelled) setBudgets(cached);
+        } else {
+          setBudgets(remote);
+        }
+      } catch (err) {
+        // Offline or API down — the cached copy above stays on screen.
+        console.error('Could not load budgets from the account:', err);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user?.id, fetchWithAuth]);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,7 +125,7 @@ function useBudgetData() {
     [budgets, categories, transactions, month]
   );
 
-  return { user, month, categories, budgets, setBudgets, statuses, loading, fetchFailed };
+  return { user, month, categories, budgets, setBudgets, statuses, loading, fetchFailed, fetchWithAuth };
 }
 
 /**
@@ -151,7 +179,8 @@ export function BudgetSummaryCard({ limit = 3 }: { limit?: number }) {
 }
 
 export default function Budgets() {
-  const { user, month, budgets, setBudgets, categories, statuses, loading, fetchFailed } = useBudgetData();
+  const { user, month, budgets, setBudgets, categories, statuses, loading, fetchFailed, fetchWithAuth } = useBudgetData();
+  const { toast } = useToast();
   const [editOpen, setEditOpen] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
 
@@ -182,7 +211,7 @@ export default function Budgets() {
     setEditOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!user) return;
     // Merge, never rebuild: budgets for categories absent from the current fetch
     // (failed request, type changed) must survive a save untouched — this
@@ -198,8 +227,15 @@ export default function Budgets() {
       }
     }
     setBudgets(next); // optimistic — UI updates immediately
-    saveBudgets(user.id, next);
     setEditOpen(false);
+    try {
+      await pushBudgets(fetchWithAuth, user.id, next);
+    } catch (err) {
+      // pushBudgets already wrote the local cache, so the edit survives on this
+      // device and will sync on the next successful save.
+      console.error('Failed to save budgets to the account:', err);
+      toast('Budgets saved on this device but could not reach your account. They will sync when you are back online.', { type: 'error' });
+    }
   };
 
   if (loading) {
@@ -316,8 +352,8 @@ export default function Budgets() {
       )}
 
       <p className="flex items-center justify-center gap-1.5 text-[11px] text-[var(--text-tertiary)]">
-        <HardDrive className="w-3 h-3" />
-        Budgets are stored on this device.
+        <Cloud className="w-3 h-3" />
+        Budgets are saved to your account and sync across devices.
       </p>
 
       {/* Edit modal */}
@@ -375,3 +411,4 @@ export default function Budgets() {
     </div>
   );
 }
+

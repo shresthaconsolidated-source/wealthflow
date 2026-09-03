@@ -445,7 +445,7 @@ app.get(["/api/user/settings", "/user/settings"], asyncHandler(async (req: any, 
       return res.status(500).json({ error: error.message });
     }
 
-    res.json(data || { base_currency: 'USD' });
+    res.json(data || { base_currency: 'USD', budgets: [] });
   } catch (err: any) {
     console.error("Unexpected error fetching user settings:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -476,6 +476,25 @@ app.post(["/api/user/settings", "/user/settings"], asyncHandler(async (req: any,
       fire_manual_starting_capital: updates.fire_manual_starting_capital !== undefined ? updates.fire_manual_starting_capital : existing?.fire_manual_starting_capital,
       fire_bulk_events: updates.fire_bulk_events !== undefined ? updates.fire_bulk_events : (existing?.fire_bulk_events || []),
     };
+
+    // `budgets` is a later addition to user_settings. Touch it only when the
+    // column is actually present, so this endpoint (currency, FIRE settings)
+    // keeps working on a database where the migration hasn't been applied yet.
+    // `existing` comes from select('*'), so the key is there whenever the
+    // column is. A budget write against a database without it fails loudly
+    // rather than reporting a save that never happened.
+    const budgetsColumnPresent = !existing || 'budgets' in existing;
+    if (updates.budgets !== undefined && !budgetsColumnPresent) {
+      return res.status(503).json({
+        error: 'Budget sync is not enabled on this database yet: user_settings.budgets column is missing.'
+      });
+    }
+    if (budgetsColumnPresent) {
+      // Callers that only save currency or FIRE settings omit `budgets`; the
+      // stored copy must survive those writes untouched.
+      (finalSettings as any).budgets =
+        updates.budgets !== undefined ? updates.budgets : (existing?.budgets ?? []);
+    }
 
     const { error } = await supabase
       .from('user_settings')
