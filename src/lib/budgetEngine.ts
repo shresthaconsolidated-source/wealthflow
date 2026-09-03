@@ -4,6 +4,16 @@
 export interface Budget {
     categoryId: string;
     limit: number;
+    /**
+     * 'YYYY-MM' the limit was set for. Absent means "the original, undated
+     * budget" — kept so budgets saved before per-month support still apply.
+     *
+     * Resolution is per whole month, not per category: a month that has any
+     * entries is authoritative for that month, and a month with none inherits
+     * the most recent earlier month that does. So clearing a category in an
+     * authored month really removes it, instead of silently falling back.
+     */
+    month?: string;
 }
 
 export type BudgetState = 'ok' | 'warning' | 'over';
@@ -41,6 +51,7 @@ const storageKey = (userId: string) => `wf_budgets_${userId}`;
 function isValidBudget(b: unknown): b is Budget {
     if (!b || typeof b !== 'object') return false;
     const candidate = b as Record<string, unknown>;
+    if (candidate.month !== undefined && !isMonthKey(candidate.month)) return false;
     return (
         typeof candidate.categoryId === 'string' &&
         candidate.categoryId.length > 0 &&
@@ -48,6 +59,66 @@ function isValidBudget(b: unknown): b is Budget {
         Number.isFinite(candidate.limit) &&
         candidate.limit > 0
     );
+}
+
+/** 'YYYY-MM' */
+export function isMonthKey(v: unknown): v is string {
+    return typeof v === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(v);
+}
+
+/** Step a 'YYYY-MM' key by whole months. */
+export function shiftMonth(monthISO: string, delta: number): string {
+    const [y, m] = monthISO.split('-').map(Number);
+    const d = new Date(y, (m - 1) + delta, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Months that have their own budget sheet, oldest first. Undated entries are '' . */
+export function budgetMonths(budgets: Budget[]): string[] {
+    const keys = new Set<string>();
+    for (const b of budgets || []) {
+        if (isValidBudget(b)) keys.add(b.month || '');
+    }
+    return [...keys].sort();
+}
+
+/**
+ * The budget sheet in force for `monthISO`: that month's own entries if it has
+ * any, otherwise the most recent earlier sheet (undated entries being the
+ * earliest of all). Returns [] when nothing has ever been set.
+ */
+export function resolveBudgetsForMonth(budgets: Budget[], monthISO: string): Budget[] {
+    const valid = (budgets || []).filter(isValidBudget);
+    if (valid.length === 0) return [];
+
+    const bySheet = new Map<string, Budget[]>();
+    for (const b of valid) {
+        const key = b.month || '';
+        const bucket = bySheet.get(key);
+        if (bucket) bucket.push(b);
+        else bySheet.set(key, [b]);
+    }
+
+    const applicable = [...bySheet.keys()].filter(k => k === '' || k <= monthISO).sort();
+    if (applicable.length === 0) return [];
+    return bySheet.get(applicable[applicable.length - 1]) || [];
+}
+
+/** Whether `monthISO` has a sheet of its own, as opposed to inheriting one. */
+export function hasOwnSheet(budgets: Budget[], monthISO: string): boolean {
+    return (budgets || []).some(b => isValidBudget(b) && (b.month || '') === monthISO);
+}
+
+/**
+ * Replace the sheet for `monthISO` with `entries`, leaving every other month
+ * untouched. Passing [] clears that month, so it inherits again.
+ */
+export function setMonthSheet(budgets: Budget[], monthISO: string, entries: Budget[]): Budget[] {
+    const others = (budgets || []).filter(b => isValidBudget(b) && (b.month || '') !== monthISO);
+    const stamped = entries
+        .filter(isValidBudget)
+        .map(b => ({ categoryId: b.categoryId, limit: b.limit, month: monthISO }));
+    return [...others, ...stamped];
 }
 
 export function loadBudgets(userId: string): Budget[] {
@@ -142,7 +213,7 @@ export function computeBudgetStatus(
     }
 
     const statuses: BudgetStatus[] = [];
-    for (const b of budgets || []) {
+    for (const b of resolveBudgetsForMonth(budgets, monthISO)) {
         if (!isValidBudget(b)) continue;
         const category = categoryById.get(b.categoryId);
         if (!category) continue; // category was deleted — orphaned budget

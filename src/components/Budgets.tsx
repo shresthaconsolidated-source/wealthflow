@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Target, SlidersHorizontal, PiggyBank, Cloud } from 'lucide-react';
+import { Target, SlidersHorizontal, PiggyBank, Cloud, ChevronLeft, ChevronRight, CornerUpLeft, Copy } from 'lucide-react';
 import { Card, Button, Badge, EmptyState, Modal, Skeleton, useToast } from '@/src/components/ui';
 import { inputBaseClasses } from '@/src/components/ui/Input';
 import { cn, formatCurrency, getCurrencySymbol } from '@/src/lib/utils';
@@ -13,6 +13,10 @@ import {
   fetchBudgets,
   pushBudgets,
   computeBudgetStatus,
+  resolveBudgetsForMonth,
+  hasOwnSheet,
+  setMonthSheet,
+  shiftMonth,
 } from '@/src/lib/budgetEngine';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
@@ -59,11 +63,16 @@ function useBudgetData() {
   const [fetchFailed, setFetchFailed] = useState(false);
 
   const [month, setMonth] = useState(localMonthISO);
+  // Set once the user steps to another month, so the roll-over refresh below
+  // doesn't drag them back to today while they're editing a future sheet.
+  const [pinned, setPinned] = useState(false);
   useEffect(() => {
-    const refresh = () => setMonth(localMonthISO());
+    const refresh = () => { if (!pinned) setMonth(localMonthISO()); };
     document.addEventListener('visibilitychange', refresh);
     return () => document.removeEventListener('visibilitychange', refresh);
-  }, []);
+  }, [pinned]);
+
+  const goToMonth = (next: string) => { setMonth(next); setPinned(next !== localMonthISO()); };
 
   // Paint from the local cache immediately, then reconcile with the account
   // copy. If the account has none but this device does, the device copy is
@@ -125,7 +134,7 @@ function useBudgetData() {
     [budgets, categories, transactions, month]
   );
 
-  return { user, month, categories, budgets, setBudgets, statuses, loading, fetchFailed, fetchWithAuth };
+  return { user, month, goToMonth, categories, budgets, setBudgets, statuses, loading, fetchFailed, fetchWithAuth };
 }
 
 /**
@@ -179,7 +188,7 @@ export function BudgetSummaryCard({ limit = 3 }: { limit?: number }) {
 }
 
 export default function Budgets() {
-  const { user, month, budgets, setBudgets, categories, statuses, loading, fetchFailed, fetchWithAuth } = useBudgetData();
+  const { user, month, goToMonth, budgets, setBudgets, categories, statuses, loading, fetchFailed, fetchWithAuth } = useBudgetData();
   const { toast } = useToast();
   const [editOpen, setEditOpen] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -204,28 +213,52 @@ export default function Budgets() {
   const overallState: BudgetStatus['state'] =
     totalSpent > totalLimit ? 'over' : totalPct >= 80 ? 'warning' : 'ok';
 
+  // The sheet in force for the month on screen — either the month's own or the
+  // one it inherits. Editing starts from whatever is actually being applied.
+  const activeSheet = useMemo(() => resolveBudgetsForMonth(budgets, month), [budgets, month]);
+  const monthIsAuthored = useMemo(() => hasOwnSheet(budgets, month), [budgets, month]);
+  const isCurrentMonth = month === localMonthISO();
+
+  // The month before the one on screen, and the sheet in force there — used by
+  // the "copy from" action so a new month can start from last month's numbers.
+  const prevMonth = shiftMonth(month, -1);
+  const prevSheet = useMemo(() => resolveBudgetsForMonth(budgets, prevMonth), [budgets, prevMonth]);
+  const prevMonthLabel = useMemo(
+    () => new Date(`${prevMonth}-01T00:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+    [prevMonth]
+  );
+
+  const copyFromPrevious = () => {
+    const next: Record<string, string> = {};
+    for (const b of prevSheet) next[b.categoryId] = String(b.limit);
+    setDraft(next);
+  };
+
+  const clearDraft = () => setDraft({});
+
   const openEditor = () => {
     const next: Record<string, string> = {};
-    for (const b of budgets) next[b.categoryId] = String(b.limit);
+    for (const b of activeSheet) next[b.categoryId] = String(b.limit);
     setDraft(next);
     setEditOpen(true);
   };
 
   const handleSave = async () => {
     if (!user) return;
-    // Merge, never rebuild: budgets for categories absent from the current fetch
-    // (failed request, type changed) must survive a save untouched — this
-    // localStorage copy is the only copy.
+    // Merge, never rebuild: limits for categories absent from the current fetch
+    // (failed request, type changed) must survive a save untouched.
     const known = new Set(expenseCategories.map((c: any) => String(c.id)));
-    const next: Budget[] = budgets.filter(b => !known.has(String(b.categoryId)));
+    const sheet: Budget[] = activeSheet.filter(b => !known.has(String(b.categoryId)));
     for (const c of expenseCategories) {
       const raw = (draft[c.id] ?? '').trim();
       if (!raw) continue;
       const value = Number(raw);
       if (Number.isFinite(value) && value > 0) {
-        next.push({ categoryId: String(c.id), limit: value });
+        sheet.push({ categoryId: String(c.id), limit: value });
       }
     }
+    // Only this month's sheet is replaced; other months keep theirs.
+    const next = setMonthSheet(budgets, month, sheet);
     setBudgets(next); // optimistic — UI updates immediately
     setEditOpen(false);
     try {
@@ -247,18 +280,59 @@ export default function Budgets() {
     );
   }
 
+  const stepper = (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => goToMonth(shiftMonth(month, -1))}
+          aria-label="Previous month"
+          className="p-2 rounded-xl border border-[var(--border-1)] bg-[var(--surface-1)] text-[var(--text-secondary)] hover:text-white hover:bg-white/5 transition-all"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <p className="min-w-[9.5rem] text-center text-sm font-bold text-[var(--text-primary)]">{monthLabel}</p>
+        <button
+          onClick={() => goToMonth(shiftMonth(month, 1))}
+          aria-label="Next month"
+          className="p-2 rounded-xl border border-[var(--border-1)] bg-[var(--surface-1)] text-[var(--text-secondary)] hover:text-white hover:bg-white/5 transition-all"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+        {!isCurrentMonth && (
+          <button
+            onClick={() => goToMonth(localMonthISO())}
+            className="ml-1 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border-1)] bg-[var(--surface-1)] text-[10px] font-bold uppercase tracking-widest text-[var(--text-tertiary)] hover:text-white hover:bg-white/5 transition-all"
+          >
+            <CornerUpLeft className="w-3 h-3" />
+            This month
+          </button>
+        )}
+      </div>
+      {activeSheet.length > 0 && (
+        monthIsAuthored
+          ? <Badge tone="success">Budget set for this month</Badge>
+          : <Badge tone="neutral">Carried forward</Badge>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-5 lg:space-y-6">
-      {budgets.length === 0 ? (
+      {stepper}
+      {activeSheet.length === 0 ? (
         <Card level={1} padding="lg">
           <EmptyState
             icon={Target}
-            title="No budgets configured"
-            description="Set monthly limits per category to keep your spending on track."
+            title={budgets.length === 0 ? 'No budgets configured' : `No budget for ${monthLabel}`}
+            description={
+              budgets.length === 0
+                ? 'Set monthly limits per category to keep your spending on track.'
+                : 'This month has no limits of its own and no earlier month to inherit from.'
+            }
             action={
               <Button onClick={openEditor}>
                 <SlidersHorizontal className="w-4 h-4" />
-                Set budgets
+                Set budgets for {monthLabel}
               </Button>
             }
             bordered
@@ -360,8 +434,8 @@ export default function Budgets() {
       <Modal
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        title="Set budgets"
-        description="Monthly spending limits per category. Leave blank for no budget."
+        title={`Set budgets — ${monthLabel}`}
+        description="Limits per category for this month. They carry into later months until you set those months differently. Leave blank for no budget."
         footer={
           <div className="flex items-center justify-end gap-3">
             {fetchFailed && (
@@ -385,6 +459,17 @@ export default function Budgets() {
           />
         ) : (
           <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2 pb-3 mb-1 border-b border-[var(--border-1)]">
+              {prevSheet.length > 0 && (
+                <Button variant="secondary" size="sm" onClick={copyFromPrevious}>
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy from {prevMonthLabel}
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={clearDraft}>
+                Clear all
+              </Button>
+            </div>
             {expenseCategories.map((c: any) => (
               <div key={c.id} className="flex items-center justify-between gap-4">
                 <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{c.name}</p>
