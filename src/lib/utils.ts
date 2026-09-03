@@ -31,3 +31,29 @@ export function getCurrencySymbol(currencyCode?: string) {
     return '$';
   }
 }
+
+// Normalizes any stored/loose date value into the `YYYY-MM-DDTHH:mm` shape
+// that <input type="datetime-local"> requires, in the user's local timezone.
+export function getLocalDatetimePattern(dateStr?: string | null) {
+  if (!dateStr) {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  }
+  if (dateStr.length === 16 && dateStr.includes('T')) return dateStr;
+  if (dateStr.length === 10 && !dateStr.includes('T')) return `${dateStr}T00:00`;
+
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  }
+
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T${hh}:${mins}`;
+}
