@@ -236,6 +236,12 @@ export default function Budgets() {
 
   const clearDraft = () => setDraft({});
 
+  // Multi-character symbols (NPR, CHF...) need more room than a single glyph,
+  // otherwise the prefix sits on top of the amount.
+  const currencySymbol = getCurrencySymbol();
+  const symbolPadding =
+    currencySymbol.length >= 3 ? 'pl-14' : currencySymbol.length === 2 ? 'pl-12' : 'pl-9';
+
   const openEditor = () => {
     const next: Record<string, string> = {};
     for (const b of activeSheet) next[b.categoryId] = String(b.limit);
@@ -473,9 +479,9 @@ export default function Budgets() {
             {expenseCategories.map((c: any) => (
               <div key={c.id} className="flex items-center justify-between gap-4">
                 <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{c.name}</p>
-                <div className="relative w-36 shrink-0">
+                <div className="relative w-40 shrink-0">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-tertiary)] pointer-events-none">
-                    {getCurrencySymbol()}
+                    {currencySymbol}
                   </span>
                   <input
                     type="number"
@@ -485,7 +491,7 @@ export default function Budgets() {
                     placeholder="—"
                     value={draft[c.id] ?? ''}
                     onChange={e => setDraft(prev => ({ ...prev, [c.id]: e.target.value }))}
-                    className={cn(inputBaseClasses, 'pl-9 tnum')}
+                    className={cn(inputBaseClasses, symbolPadding, 'tnum')}
                   />
                 </div>
               </div>
@@ -496,4 +502,5 @@ export default function Budgets() {
     </div>
   );
 }
+
 

@@ -21,12 +21,23 @@ interface ModalProps {
 export default function Modal({ open, onClose, title, description, children, className, footer }: ModalProps) {
   const panelRef = React.useRef<HTMLDivElement>(null);
 
+  // Callers pass `onClose` as an inline arrow, so its identity changes on every
+  // render of the parent. Read it through a ref: with `onClose` in the effect's
+  // dependencies below, a parent re-render (one keystroke in a controlled field
+  // is enough) tore the effect down and the cleanup's focus restore pulled the
+  // caret out of whatever input was being typed in.
+  const onCloseRef = React.useRef(onClose);
+  React.useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   // Escape closes; focus moves into the dialog on open and back on close.
+  // Keyed on `open` alone so this runs exactly once per open/close.
   React.useEffect(() => {
     if (!open) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('keydown', onKeyDown);
     // Only steal focus if nothing inside the dialog (e.g. an autoFocus input) has claimed it
@@ -39,7 +50,7 @@ export default function Modal({ open, onClose, title, description, children, cla
       document.removeEventListener('keydown', onKeyDown);
       previouslyFocused?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return (
     <AnimatePresence>
