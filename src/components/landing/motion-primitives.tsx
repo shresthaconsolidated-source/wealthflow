@@ -22,6 +22,7 @@ import {
   useSpring,
   useInView,
   useMotionValue,
+  useMotionValueEvent,
   animate,
   useReducedMotion,
   type MotionValue,
@@ -86,12 +87,19 @@ export function CountUp({
   prefix = '',
   suffix = '',
   decimals = 0,
+  delay = 0,
+  start,
   className,
 }: {
   to: number;
   prefix?: string;
   suffix?: string;
   decimals?: number;
+  delay?: number;
+  /** When provided, the count runs on this going true instead of on entering
+   *  the viewport — used by the sticky stack so each figure arrives as its
+   *  card takes focus, not all at once on page load. */
+  start?: boolean;
   className?: string;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -99,11 +107,10 @@ export function CountUp({
   const inView = useInView(ref, { once: true, amount: 0.5 });
   const value = useMotionValue(reduce ? to : 0);
 
-  // Rendered THROUGH the motion value rather than through React state or an
-  // imperative textContent write. A ref write gets clobbered the moment React
-  // re-renders the span; a state write would re-render every frame. Passing
-  // the value as a motion child updates the text node directly, outside the
-  // render cycle, and survives re-renders.
+  // Rendered THROUGH the motion value rather than React state or a textContent
+  // write. A ref write is clobbered by the next React render — which is exactly
+  // what broke the first version. Passing the value as a motion child updates
+  // the text node outside the render cycle and survives re-renders.
   const text = useTransform(value, v =>
     `${prefix}${v.toLocaleString('en-US', {
       minimumFractionDigits: decimals,
@@ -111,18 +118,73 @@ export function CountUp({
     })}${suffix}`
   );
 
+  const go = start === undefined ? inView : start;
+
   React.useEffect(() => {
     if (reduce) { value.set(to); return; }
-    if (!inView) return;
-    const controls = animate(value, to, { duration: 1.4, ease: EASE });
+    if (!go) return;
+    // No "already fired" ref here. StrictMode runs effects twice in dev:
+    // mount -> start, cleanup -> controls.stop(), re-run -> blocked by the
+    // guard, leaving the figure frozen at 0. Comparing against the target is
+    // idempotent instead: a re-run mid-animation simply continues from where
+    // the value already is.
+    if (value.get() === to) return;
+    const controls = animate(value, to, { duration: 0.85, delay, ease: EASE });
     return () => controls.stop();
-  }, [inView, to, reduce, value]);
+  }, [go, to, reduce, value, delay]);
 
   return (
     <motion.span ref={ref} className={className}>
       {text}
     </motion.span>
   );
+}
+
+/* ------------------------------------------------------------------ */
+/* Drawn rule                                                          */
+/* ------------------------------------------------------------------ */
+/**
+ * A hairline that draws itself left to right as its row enters. Used under
+ * the privacy claims: the line finishing is what makes each claim feel
+ * settled rather than merely present.
+ */
+export function DrawnRule({ delay = 0, className }: { delay?: number; className?: string }) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      className={cn('h-px w-full origin-left', className)}
+      initial={reduce ? false : { scaleX: 0 }}
+      whileInView={{ scaleX: 1 }}
+      viewport={{ once: true, amount: 0.8 }}
+      transition={{ delay, duration: 0.9, ease: EASE }}
+    />
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Ground lift                                                         */
+/* ------------------------------------------------------------------ */
+/**
+ * The closing section warms toward the accent as it enters, so the page
+ * visibly arrives somewhere instead of just stopping. Scroll-linked, so the
+ * reader drives it.
+ */
+export function useGroundLift() {
+  const ref = useRef<HTMLElement>(null);
+  const reduce = useReducedMotion();
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ['start end', 'center center'],
+  });
+  const raw = useTransform(scrollYProgress, [0, 1], [0, 1]);
+  const p = useSpring(raw, { stiffness: 90, damping: 28, mass: 0.5 });
+  const background = useTransform(
+    p,
+    [0, 1],
+    ['radial-gradient(120% 80% at 50% 120%, rgba(46,230,166,0) 0%, rgba(46,230,166,0) 60%)',
+     'radial-gradient(120% 80% at 50% 120%, rgba(46,230,166,0.16) 0%, rgba(46,230,166,0) 62%)']
+  );
+  return { ref, background: reduce ? undefined : background };
 }
 
 /* ------------------------------------------------------------------ */
@@ -164,7 +226,7 @@ export function StickyStack({
   step = 14,
 }: {
   count: number;
-  children: (index: number, style: StackStyle) => React.ReactNode;
+  children: (index: number, style: StackStyle, focused: boolean) => React.ReactNode;
   /** Where the first card pins. */
   topOffset?: string;
   /** Each card rests this many px lower, so the stack shows its own edges. */
@@ -212,10 +274,19 @@ const StackItem = React.memo(function StackItem({
   progress: MotionValue<number>;
   topOffset: string;
   step: number;
-  render: (index: number, style: StackStyle) => React.ReactNode;
+  render: (index: number, style: StackStyle, focused: boolean) => React.ReactNode;
 }) {
   const reduce = useReducedMotion();
   const isLast = index === count - 1;
+
+  // One state flip per card when it takes focus — not a per-frame update.
+  // `useMotionValueEvent` reads the motion value outside the render cycle and
+  // only calls setState on an actual transition.
+  const [focused, setFocused] = React.useState(index === 0);
+  useMotionValueEvent(progress, 'change', v => {
+    const active = v >= (index - 0.35) / count;
+    setFocused(prev => (prev === active ? prev : active));
+  });
 
   // This card recedes across the slice of the scroll during which the NEXT
   // card travels over it.
@@ -233,7 +304,7 @@ const StackItem = React.memo(function StackItem({
       className="sticky"
       style={{ top: `calc(${topOffset} + ${index * step}px)`, zIndex: index + 1 }}
     >
-      {render(index, style)}
+      {render(index, style, reduce ? true : focused)}
     </div>
   );
 });
@@ -249,19 +320,30 @@ const StackItem = React.memo(function StackItem({
 export function KineticStatement({
   words,
   accentFrom,
+  landTogetherFrom,
   className,
 }: {
   words: string[];
   /** Index from which words take the accent colour. */
   accentFrom?: number;
+  /** Words from this index share one range, so the phrase lands as a unit
+   *  instead of trailing off one word at a time. */
+  landTogetherFrom?: number;
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
+  // A long, unhurried range: the statement is the section, so it should take
+  // the whole of it to resolve rather than finishing in the first third.
   const { scrollYProgress } = useScroll({
     target: ref,
-    offset: ['start 0.85', 'end 0.4'],
+    offset: ['start 0.92', 'end 0.55'],
   });
+
+  // Words before the grouping point each get their own slice; the closing
+  // phrase shares one.
+  const groupAt = landTogetherFrom ?? words.length;
+  const slices = Math.min(groupAt, words.length) + (groupAt < words.length ? 1 : 0);
 
   return (
     <div ref={ref} className={cn('flex flex-wrap gap-x-[0.3em] gap-y-1', className)}>
@@ -269,8 +351,8 @@ export function KineticStatement({
         <KineticWord
           key={`${w}-${i}`}
           word={w}
-          index={i}
-          total={words.length}
+          slot={i < groupAt ? i : groupAt}
+          slices={slices}
           progress={scrollYProgress}
           reduce={!!reduce}
           accent={accentFrom !== undefined && i >= accentFrom}
@@ -282,24 +364,25 @@ export function KineticStatement({
 
 const KineticWord = React.memo(function KineticWord({
   word,
-  index,
-  total,
+  slot,
+  slices,
   progress,
   reduce,
   accent,
 }: {
   word: string;
-  index: number;
-  total: number;
+  slot: number;
+  slices: number;
   progress: MotionValue<number>;
   reduce: boolean;
   accent: boolean;
 }) {
   // Each word claims a slice of the section's scroll range, so they resolve
-  // left-to-right as the reader moves down.
-  const start = index / total;
-  const end = start + 1 / total;
-  const opacity = useTransform(progress, [start, end], [0.16, 1]);
+  // left to right as the reader moves down. Words sharing a slot resolve
+  // together.
+  const start = slot / slices;
+  const end = start + 1 / slices;
+  const opacity = useTransform(progress, [start, end], [0.14, 1]);
 
   return (
     <motion.span

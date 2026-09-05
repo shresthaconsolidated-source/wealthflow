@@ -52,6 +52,18 @@
 
     /* One easing curve, used everywhere motion happens */
     --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Light "paper" ground, used only by the landing page to break the page
+     into rooms. Emerald at --accent is ~1.6:1 on paper and fails badly as
+     text, so light sections use --accent-ink instead, which clears WCAG AA
+     against --paper-0. */
+  --paper-0: #f4f3f0;
+  --paper-1: #eceae5;
+  --paper-border: rgba(18, 20, 24, 0.10);
+  --ink-primary: #14161a;
+  --ink-secondary: #4a4f57;
+  --ink-tertiary: #767b83;
+  --accent-ink: #07704f;
   }
 
   body {

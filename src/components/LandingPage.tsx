@@ -19,6 +19,8 @@ import {
   ScrollProgressBar,
   SpringPress,
   useParallax,
+  DrawnRule,
+  useGroundLift,
 } from '@/src/components/landing/motion-primitives';
 
 interface Props {
@@ -54,7 +56,7 @@ const STACK = [
     barTone: 'bg-[var(--gold)]/25',
     title: 'A real FIRE number',
     body: 'Model the path to financial independence with inflation, raises and one-off events accounted for — not a back-of-napkin guess that ignores the messy parts.',
-    stat: '11.4',
+    stat: 11.4, statDecimals: 1, statSuffix: '',
     statLabel: 'years to independence',
     bars: [26, 34, 30, 42, 51, 47, 60, 68, 64, 79, 88, 100],
   },
@@ -64,7 +66,7 @@ const STACK = [
     barTone: 'bg-[var(--accent)]/25',
     title: 'One net worth, everywhere',
     body: 'Every account, asset and liability rolled into a single always-current figure — including the ones that only exist on paper, and the ones you owe.',
-    stat: '12',
+    stat: 12, statDecimals: 0, statSuffix: '',
     statLabel: 'accounts in one figure',
     bars: [40, 52, 48, 61, 58, 70, 66, 78, 84, 80, 92, 97],
   },
@@ -74,7 +76,7 @@ const STACK = [
     barTone: 'bg-blue-400/25',
     title: 'Spending that explains itself',
     body: 'Recurring bills surface on their own. Trends arrive before you go looking for them, and one-off distortions stay out of your averages.',
-    stat: '41.3%',
+    stat: 41.3, statDecimals: 1, statSuffix: '%',
     statLabel: 'savings rate, trailing year',
     bars: [55, 48, 62, 58, 71, 65, 74, 69, 82, 77, 88, 91],
   },
@@ -93,9 +95,12 @@ const FREE_FEATURES = [
   'CSV export, anytime',
 ];
 
+// "Shared household access" used to sit here and contradicted the hero's
+// "Built for one — just you". The single-user promise is the stronger claim
+// and the rest of the page is built on it, so the household feature goes.
 const PRO_FEATURES = [
   'Automatic bank sync',
-  'Shared household access',
+  'Scheduled off-site backups',
   'Priority support',
 ];
 
@@ -157,7 +162,7 @@ function NetWorthChart({ animate }: { animate: boolean }) {
         fill="url(#nwFill)"
         initial={animate ? { opacity: 0 } : false}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.5, duration: 0.8, ease: EASE }}
+        transition={{ delay: 0.45, duration: 0.5, ease: EASE }}
       />
       <motion.path
         d={line}
@@ -168,7 +173,7 @@ function NetWorthChart({ animate }: { animate: boolean }) {
         strokeLinejoin="round"
         initial={animate ? { pathLength: 0 } : false}
         animate={{ pathLength: 1 }}
-        transition={{ delay: 0.25, duration: 1.1, ease: EASE }}
+        transition={{ delay: 0.22, duration: 0.62, ease: EASE }}
       />
       <motion.circle
         cx={pts[pts.length - 1][0]}
@@ -177,7 +182,7 @@ function NetWorthChart({ animate }: { animate: boolean }) {
         fill="var(--accent)"
         initial={animate ? { scale: 0 } : false}
         animate={{ scale: 1 }}
-        transition={{ delay: 1.15, ease: EASE }}
+        transition={{ delay: 0.82, duration: 0.3, ease: EASE }}
       />
     </svg>
   );
@@ -192,6 +197,7 @@ export default function LandingPage({ onLoginSuccess }: Props) {
   // The data panel drifts against the copy as the hero leaves — a depth cue,
   // so the hero reads as two planes rather than one flat block.
   const heroPanel = useParallax(34);
+  const closer = useGroundLift();
 
   /** Entrance helper — one place, so timing stays consistent across sections. */
   const rise = (delay = 0) =>
@@ -214,8 +220,16 @@ export default function LandingPage({ onLoginSuccess }: Props) {
     />
   );
 
+  // The wrapper's overflow-x MUST stay `clip`, never `hidden`.
+  // `hidden` computes to `overflow: hidden auto`, which makes this wrapper the
+  // nearest scrollport for every descendant. The window is what actually
+  // scrolls, so the sticky cards below then have no scrollport to pin against
+  // and scroll away as static content — measured at 1440x900, their rect.top
+  // ran 460 -> 199 -> -62 -> ... decreasing linearly with no clamp.
+  // `clip` suppresses horizontal overflow without creating a scroll container,
+  // so position: sticky survives it.
   return (
-    <div className="min-h-screen bg-[var(--surface-0)] text-[var(--text-primary)] selection:bg-[var(--accent)]/25 overflow-x-hidden antialiased">
+    <div className="min-h-screen bg-[var(--surface-0)] text-[var(--text-primary)] selection:bg-[var(--accent)]/25 overflow-x-clip antialiased">
       {/* One quiet light source, top-left. No mesh, no second glow. */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute -top-[20%] -left-[5%] w-[50%] h-[50%] bg-[var(--accent)]/[0.05] blur-[150px] rounded-full" />
@@ -296,7 +310,7 @@ export default function LandingPage({ onLoginSuccess }: Props) {
                   <div>
                     <p className="text-[11px] text-[var(--text-tertiary)] tracking-wide">Net worth</p>
                     <p className="font-mono text-3xl sm:text-[2rem] font-semibold tracking-[-0.03em] mt-1.5 tabular-nums">
-                      <CountUp to={284930} prefix="$" />
+                      <CountUp to={284930} prefix="$" delay={0.45} />
                     </p>
                   </div>
                   <span className="shrink-0 mt-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] text-[12px] font-medium font-mono tabular-nums">
@@ -314,7 +328,14 @@ export default function LandingPage({ onLoginSuccess }: Props) {
                     ['Savings rate', '41.3%'],
                     ['FIRE in', '11.4 yrs'],
                   ].map(([label, value], i) => (
-                    <div key={label}>
+                    <motion.div
+                      key={label}
+                      {...(animate ? {
+                        initial: { opacity: 0, y: 8 },
+                        animate: { opacity: 1, y: 0 },
+                        transition: { delay: 0.86 + i * 0.07, duration: 0.45, ease: EASE },
+                      } : {})}
+                    >
                       <p className="text-[11px] text-[var(--text-tertiary)]">{label}</p>
                       <p className={cn(
                         'font-mono text-[15px] font-medium mt-1 tabular-nums',
@@ -322,7 +343,7 @@ export default function LandingPage({ onLoginSuccess }: Props) {
                       )}>
                         {value}
                       </p>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               </motion.div>
@@ -342,16 +363,19 @@ export default function LandingPage({ onLoginSuccess }: Props) {
           </motion.h2>
         </div>
 
-        <div className="max-w-5xl mx-auto px-6 mt-14 pb-[25vh]">
+        <div className="max-w-5xl mx-auto px-6 mt-14 pb-[45vh]">
           <StickyStack count={STACK.length}>
-            {(i, style) => {
+            {(i, style, focused) => {
               const card = STACK[i];
               return (
                 <motion.div
                   style={style}
                   className={cn(
                     'origin-top rounded-2xl border p-8 md:p-12 flex flex-col justify-between',
-                    'min-h-[clamp(360px,52vh,480px)]',
+                    // Dwell time per card == this height, because the gap
+                    // between sticky pin events is the preceding sibling's
+                    // height. At 48vh each card held focus for only ~400px.
+                    'min-h-[clamp(420px,66vh,600px)] mb-[10vh]',
                     'bg-[var(--surface-1)] border-[var(--border-2)]',
                     'shadow-[0_-8px_40px_-12px_rgba(0,0,0,0.65)]'
                   )}
@@ -374,7 +398,14 @@ export default function LandingPage({ onLoginSuccess }: Props) {
                   <div className="mt-10 flex items-end justify-between gap-8">
                     <div>
                       <p className={cn('font-mono text-[2.5rem] md:text-[3rem] leading-none font-semibold tabular-nums', card.tone)}>
-                        {card.stat}
+                        {/* Counts as this card takes focus, not on page load —
+                            the figure belongs to the card the reader is on. */}
+                        <CountUp
+                          to={card.stat}
+                          decimals={card.statDecimals}
+                          suffix={card.statSuffix}
+                          start={focused}
+                        />
                       </p>
                       <p className="text-[11px] text-[var(--text-tertiary)] mt-2.5">{card.statLabel}</p>
                     </div>
@@ -386,9 +417,8 @@ export default function LandingPage({ onLoginSuccess }: Props) {
                           style={{ height: `${v}%` }}
                           {...(animate ? {
                             initial: { scaleY: 0 },
-                            whileInView: { scaleY: 1 },
-                            viewport: { once: true },
-                            transition: { delay: bi * 0.03, duration: 0.5, ease: EASE },
+                            animate: { scaleY: focused ? 1 : 0 },
+                            transition: { delay: bi * 0.028, duration: 0.45, ease: EASE },
                           } : {})}
                         />
                       ))}
@@ -404,94 +434,159 @@ export default function LandingPage({ onLoginSuccess }: Props) {
       {/* ------------------------------------------------- kinetic statement */}
       {/* The sentence is the content, so reading it is the interaction —
           each word resolves as the reader moves down. */}
-      <section className="relative z-10 py-28 md:py-40 border-t border-[var(--border-1)]">
+      <section className="relative z-10 py-36 md:py-56 border-t border-[var(--border-1)]">
         <div className="max-w-5xl mx-auto px-6">
           <KineticStatement
             words={['Every', 'account.', 'Every', 'asset.', 'One', 'honest', 'number.']}
             accentFrom={4}
+            landTogetherFrom={4}
             className="text-[2.4rem] sm:text-5xl md:text-[4.2rem] font-semibold tracking-[-0.035em] leading-[1.05] max-w-[16ch]"
           />
         </div>
       </section>
 
-      {/* ------------------------------------------------------- privacy */}
-      {/* Full-width statement + rules. A different layout family to the grid above. */}
-      <section id="privacy" className="relative z-10 py-20 md:py-28 border-t border-[var(--border-1)]">
+      {/* ------------------------------------------------- product shot */}
+      {/* An actual screenshot of the running app. Every figure in it is
+          invented — it was captured against an isolated demo account that no
+          longer exists — but the interface is the real one, not a mockup.
+          Scroll-linked: the shot settles as it enters, so the reader feels
+          they brought it into focus. */}
+      <section className="relative z-10 pb-24 md:pb-32">
         <div className="max-w-6xl mx-auto px-6">
-          <motion.h2 {...rise()} className="text-3xl md:text-[2.6rem] font-semibold tracking-[-0.02em] max-w-[22ch] leading-[1.1]">
-            Your data exists to be shown back to you.
+          <motion.h2 {...rise()} className="text-3xl md:text-[2.6rem] font-semibold tracking-[-0.02em] max-w-[20ch] leading-[1.1]">
+            This is the whole thing.
           </motion.h2>
-          <motion.p {...rise(0.05)} className="mt-5 text-[17px] leading-relaxed text-[var(--text-secondary)] max-w-[58ch]">
-            Nothing else. WealthFlow was built by someone tracking his own path to financial
-            independence, and it runs on that one rule.
+          <motion.p {...rise(0.05)} className="mt-5 text-[17px] leading-relaxed text-[var(--text-secondary)] max-w-[52ch]">
+            No onboarding maze, no dashboard you have to assemble first. Sign in and this is
+            what you get.
           </motion.p>
 
-          <div className="mt-14 border-t border-[var(--border-1)]">
-            {PRIVACY_POINTS.map(([title, body], i) => (
+          <motion.div
+            initial={animate ? { opacity: 0, y: 40, scale: 0.97 } : false}
+            whileInView={{ opacity: 1, y: 0, scale: 1 }}
+            viewport={{ once: true, amount: 0.25 }}
+            transition={{ duration: 1, ease: EASE }}
+            className="mt-12 rounded-2xl border border-[var(--border-2)] overflow-hidden shadow-[0_40px_120px_-30px_rgba(0,0,0,0.9)]"
+          >
+            <img
+              src="/product-dashboard.png"
+              alt="The WealthFlow dashboard: total net worth, monthly income and expense, savings rate, a net-worth growth chart and asset allocation by account type."
+              width={1440}
+              height={900}
+              loading="lazy"
+              decoding="async"
+              className="w-full h-auto block"
+            />
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ---------------------------------------------- light room: privacy + pricing */}
+      {/* The page changes ground here. A uniformly dark page reads flat no
+          matter how well each section is composed; two rooms give the scroll
+          somewhere to arrive. Light sections use --ink-* and --accent-ink,
+          because emerald on paper is ~1.6:1 and fails as text. */}
+      <div className="relative z-10 bg-[var(--paper-0)] text-[var(--ink-primary)]">
+        <section id="privacy" className="py-24 md:py-32">
+          <div className="max-w-6xl mx-auto px-6">
+            <motion.h2 {...rise()} className="text-3xl md:text-[2.6rem] font-semibold tracking-[-0.02em] max-w-[22ch] leading-[1.1]">
+              Your data exists to be shown back to you.
+            </motion.h2>
+            <motion.p {...rise(0.05)} className="mt-5 text-[17px] leading-relaxed text-[var(--ink-secondary)] max-w-[58ch]">
+              Nothing else. WealthFlow was built by someone tracking his own path to financial
+              independence, and it runs on that one rule.
+            </motion.p>
+
+            <div className="mt-16">
+              {PRIVACY_POINTS.map(([title, body], i) => (
+                <div key={title}>
+                  {/* The rule drawing is what makes each claim feel settled
+                      rather than merely present. Calm, not snappy. */}
+                  <DrawnRule delay={i * 0.12} className="bg-[var(--paper-border)]" />
+                  <motion.div
+                    initial={animate ? { opacity: 0, y: 12 } : false}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.6 }}
+                    transition={{ delay: 0.15 + i * 0.12, duration: 0.8, ease: EASE }}
+                    className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-8 py-8"
+                  >
+                    <h3 className="md:col-span-4 text-[15px] font-semibold tracking-tight">{title}</h3>
+                    <p className="md:col-span-8 text-[15px] leading-relaxed text-[var(--ink-secondary)] max-w-[62ch]">{body}</p>
+                  </motion.div>
+                </div>
+              ))}
+              <DrawnRule delay={PRIVACY_POINTS.length * 0.12} className="bg-[var(--paper-border)]" />
+            </div>
+          </div>
+        </section>
+
+        {/* ----------------------------------------------------- pricing */}
+        {/* Clarity, not motion: a plain stagger and nothing else. */}
+        <section id="pricing" className="pb-24 md:pb-32">
+          <div className="max-w-6xl mx-auto px-6">
+            <motion.p {...rise()} className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-tertiary)]">
+              Pricing
+            </motion.p>
+            <motion.h2 {...rise(0.04)} className="mt-4 text-3xl md:text-[2.6rem] font-semibold tracking-[-0.02em] leading-[1.1] max-w-[20ch]">
+              Free today. Honest about tomorrow.
+            </motion.h2>
+
+            <div className="mt-14 grid grid-cols-1 lg:grid-cols-12 gap-6">
               <motion.div
-                key={title}
-                {...rise(0.06 * i)}
-                className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-8 py-7 border-b border-[var(--border-1)]"
+                initial={animate ? { opacity: 0, y: 18 } : false}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ duration: 0.7, ease: EASE }}
+                className="lg:col-span-7 rounded-2xl border border-[var(--accent-ink)]/25 bg-white/60 p-8 md:p-10"
               >
-                <h3 className="md:col-span-4 text-[15px] font-medium tracking-tight">{title}</h3>
-                <p className="md:col-span-8 text-[15px] leading-relaxed text-[var(--text-secondary)] max-w-[62ch]">{body}</p>
+                <div className="flex items-baseline gap-3">
+                  {/* Static. A price is not an accumulating quantity, and
+                      counting one up is decoration. */}
+                  <span className="font-mono text-5xl font-semibold tabular-nums">$0</span>
+                  <span className="text-[var(--ink-tertiary)] text-sm">forever</span>
+                </div>
+                <p className="mt-4 text-[15px] text-[var(--ink-secondary)] max-w-[46ch]">
+                  Currently everything. The full tracker, no limits, no trial clock.
+                </p>
+                <ul className="mt-8 space-y-3.5">
+                  {FREE_FEATURES.map(f => (
+                    <li key={f} className="flex items-start gap-3 text-[15px]">
+                      <Check className="w-4 h-4 text-[var(--accent-ink)] mt-0.5 shrink-0" strokeWidth={2.5} />
+                      <span className="text-[var(--ink-secondary)]">{f}</span>
+                    </li>
+                  ))}
+                </ul>
+                <SpringPress className="mt-9 rounded-full overflow-hidden w-fit">{signIn('continue_with')}</SpringPress>
               </motion.div>
-            ))}
+
+              <motion.div
+                initial={animate ? { opacity: 0, y: 18 } : false}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ delay: 0.1, duration: 0.7, ease: EASE }}
+                className="lg:col-span-5 rounded-2xl border border-[var(--paper-border)] p-8 md:p-10"
+              >
+                <div className="flex items-baseline gap-3">
+                  <span className="font-mono text-4xl font-semibold text-[var(--ink-secondary)] tabular-nums">$20</span>
+                  <span className="text-[var(--ink-tertiary)] text-sm">/mo when it opens</span>
+                </div>
+                <p className="mt-4 text-[15px] text-[var(--ink-tertiary)] max-w-[38ch]">
+                  For the parts that cost real money to run.
+                </p>
+                <ul className="mt-8 space-y-3.5">
+                  {PRO_FEATURES.map(f => (
+                    <li key={f} className="flex items-start gap-3 text-[15px]">
+                      <Check className="w-4 h-4 text-[var(--ink-tertiary)] mt-0.5 shrink-0" strokeWidth={2.5} />
+                      <span className="text-[var(--ink-tertiary)]">{f}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-9 text-[13px] text-[var(--ink-tertiary)]">Not open yet — nothing to pay for today.</p>
+              </motion.div>
+            </div>
           </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------- pricing */}
-      <section id="pricing" className="relative z-10 py-20 md:py-28 border-t border-[var(--border-1)]">
-        <div className="max-w-6xl mx-auto px-6">
-          <motion.p {...rise()} className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-            Pricing
-          </motion.p>
-          <motion.h2 {...rise(0.04)} className="mt-4 text-3xl md:text-[2.6rem] font-semibold tracking-[-0.02em] leading-[1.1] max-w-[20ch]">
-            Free today. Honest about tomorrow.
-          </motion.h2>
-
-          <div className="mt-14 grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <motion.div {...rise(0.05)} className="lg:col-span-7 rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent-soft)]/40 p-8 md:p-10">
-              <div className="flex items-baseline gap-3">
-                <span className="font-mono text-5xl font-semibold tabular-nums"><CountUp to={0} prefix="$" /></span>
-                <span className="text-[var(--text-tertiary)] text-sm">forever</span>
-              </div>
-              <p className="mt-4 text-[15px] text-[var(--text-secondary)] max-w-[46ch]">
-                Currently everything. The full tracker, no limits, no trial clock.
-              </p>
-              <ul className="mt-8 space-y-3.5">
-                {FREE_FEATURES.map(f => (
-                  <li key={f} className="flex items-start gap-3 text-[15px]">
-                    <Check className="w-4 h-4 text-[var(--accent)] mt-0.5 shrink-0" strokeWidth={2.5} />
-                    <span className="text-[var(--text-secondary)]">{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <SpringPress className="mt-9 rounded-full overflow-hidden w-fit">{signIn('continue_with')}</SpringPress>
-            </motion.div>
-
-            <motion.div {...rise(0.12)} className="lg:col-span-5 rounded-2xl border border-[var(--border-1)] p-8 md:p-10">
-              <div className="flex items-baseline gap-3">
-                <span className="font-mono text-4xl font-semibold text-[var(--text-secondary)] tabular-nums"><CountUp to={20} prefix="$" /></span>
-                <span className="text-[var(--text-tertiary)] text-sm">/mo, later</span>
-              </div>
-              <p className="mt-4 text-[15px] text-[var(--text-tertiary)] max-w-[38ch]">
-                For when your money lives in more than one place.
-              </p>
-              <ul className="mt-8 space-y-3.5">
-                {PRO_FEATURES.map(f => (
-                  <li key={f} className="flex items-start gap-3 text-[15px]">
-                    <Check className="w-4 h-4 text-[var(--text-tertiary)] mt-0.5 shrink-0" strokeWidth={2.5} />
-                    <span className="text-[var(--text-tertiary)]">{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-9 text-[13px] text-[var(--text-tertiary)]">Not open yet — nothing to pay for today.</p>
-            </motion.div>
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       {/* ----------------------------------------------------------- faq */}
       <section id="faq" className="relative z-10 py-20 md:py-28 border-t border-[var(--border-1)]">
@@ -511,24 +606,25 @@ export default function LandingPage({ onLoginSuccess }: Props) {
                     className="w-full flex items-start justify-between gap-6 py-6 text-left group"
                   >
                     <span className="text-[16px] font-medium tracking-tight group-hover:text-white transition-colors">{f.q}</span>
-                    <Plus
-                      className={cn(
-                        'w-4 h-4 mt-1 shrink-0 text-[var(--text-tertiary)] transition-transform duration-300',
-                        open && 'rotate-45 text-[var(--accent)]'
-                      )}
-                      strokeWidth={2}
-                    />
+                    <motion.span
+                      className="mt-1 shrink-0"
+                      animate={{ rotate: open ? 45 : 0 }}
+                      transition={reduce ? { duration: 0 } : { duration: 0.45, ease: EASE }}
+                    >
+                      <Plus className={cn('w-4 h-4', open ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]')} strokeWidth={2} />
+                    </motion.span>
                   </button>
-                  <div
-                    className={cn(
-                      'grid transition-all duration-300 ease-out',
-                      open ? 'grid-rows-[1fr] opacity-100 pb-6' : 'grid-rows-[0fr] opacity-0'
-                    )}
+                  {/* Height animated with the page's easing curve rather than
+                      a linear CSS snap, and the chevron rotates on the same
+                      timing so they read as one gesture. */}
+                  <motion.div
+                    initial={false}
+                    animate={{ height: open ? 'auto' : 0, opacity: open ? 1 : 0 }}
+                    transition={reduce ? { duration: 0 } : { height: { duration: 0.45, ease: EASE }, opacity: { duration: open ? 0.35 : 0.2, ease: EASE } }}
+                    className="overflow-hidden"
                   >
-                    <div className="overflow-hidden">
-                      <p className="text-[15px] leading-relaxed text-[var(--text-secondary)] max-w-[64ch] pr-10">{f.a}</p>
-                    </div>
-                  </div>
+                    <p className="text-[15px] leading-relaxed text-[var(--text-secondary)] max-w-[64ch] pr-10 pb-6">{f.a}</p>
+                  </motion.div>
                 </div>
               );
             })}
@@ -537,8 +633,14 @@ export default function LandingPage({ onLoginSuccess }: Props) {
       </section>
 
       {/* -------------------------------------------------------- closer */}
-      <section className="relative z-10 py-24 md:py-32 border-t border-[var(--border-1)]">
-        <div className="max-w-6xl mx-auto px-6 text-center">
+      <section ref={closer.ref} className="relative z-10 py-28 md:py-40 border-t border-[var(--border-1)] overflow-hidden">
+        {/* The page should visibly arrive somewhere rather than just stopping. */}
+        <motion.div
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none"
+          style={closer.background ? { background: closer.background } : undefined}
+        />
+        <div className="relative max-w-6xl mx-auto px-6 text-center">
           <motion.h2 {...rise()} className="text-3xl md:text-[2.9rem] font-semibold tracking-[-0.025em] leading-[1.1] max-w-[16ch] mx-auto">
             Start with one account.
           </motion.h2>
