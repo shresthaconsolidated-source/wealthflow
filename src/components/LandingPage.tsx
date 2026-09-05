@@ -240,6 +240,10 @@ export default function LandingPage({ onLoginSuccess }: Props) {
   // so position: sticky survives it.
   return (
     <div className="min-h-screen bg-[var(--surface-0)] text-[var(--text-primary)] selection:bg-[var(--accent)]/25 overflow-x-clip antialiased">
+      {/* The terrain the camera travels. Fixed behind every section, faded
+          out entirely across the light room — see NetWorthSurface. */}
+      {surfaceOn && <HeroVisual compact={!isDesktop} onReady={() => setSurfaceReady(true)} />}
+
       {/* One quiet light source, top-left. No mesh, no second glow. */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute -top-[20%] -left-[5%] w-[50%] h-[50%] bg-[var(--accent)]/[0.05] blur-[150px] rounded-full" />
@@ -314,7 +318,10 @@ export default function LandingPage({ onLoginSuccess }: Props) {
             >
               <motion.div
                 style={heroPanel.y ? { y: heroPanel.y } : undefined}
-                className="rounded-2xl border border-[var(--border-1)] bg-[var(--surface-1)]/70 backdrop-blur-sm p-6 sm:p-7"
+                className={cn(
+                  'rounded-2xl border border-[var(--border-1)] backdrop-blur-md p-6 sm:p-7 transition-colors duration-700',
+                  surfaceReady ? 'bg-[var(--surface-1)]/35' : 'bg-[var(--surface-1)]/70'
+                )}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -332,18 +339,14 @@ export default function LandingPage({ onLoginSuccess }: Props) {
                     hero reads instantly and never shifts. When the surface is
                     allowed and has painted, it fades in over the top and the
                     chart fades out beneath it. */}
+                {/* The 2D chart holds this space from first paint. Once the
+                    terrain is running it fades out and the surface reads
+                    through the panel instead — the height never changes, so
+                    nothing shifts when the chunk lands. */}
                 <div className="mt-6 relative h-[190px] sm:h-[210px]">
-                  <div
-                    className="absolute inset-0 flex items-center transition-opacity duration-700 ease-out"
-                    style={{ opacity: surfaceReady ? 0 : 1 }}
-                  >
+                  <div className="absolute inset-0 flex items-center">
                     <NetWorthChart animate={animate} />
                   </div>
-                  {surfaceOn && (
-                    <HeroVisual compact={!isDesktop} onReady={() => setSurfaceReady(true)} />
-                  )}
-                  {/* Keeps the figures legible over a moving surface. */}
-                  <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[var(--surface-1)] to-transparent pointer-events-none" />
                 </div>
 
                 <div className="mt-5 pt-5 border-t border-[var(--border-1)] grid grid-cols-3 gap-4">
