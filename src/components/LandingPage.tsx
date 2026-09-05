@@ -22,6 +22,8 @@ import {
   DrawnRule,
   useGroundLift,
 } from '@/src/components/landing/motion-primitives';
+import HeroVisual, { useSurfaceDecision } from '@/src/components/landing/HeroVisual';
+import { useIsDesktop } from '@/src/hooks/useIsDesktop';
 
 interface Props {
   onLoginSuccess: (credential: string) => void;
@@ -198,6 +200,14 @@ export default function LandingPage({ onLoginSuccess }: Props) {
   // so the hero reads as two planes rather than one flat block.
   const heroPanel = useParallax(34);
   const closer = useGroundLift();
+  // When the WebGL surface runs it replaces the 2D sparkline. Every figure
+  // stays DOM text either way — nothing is drawn into the canvas.
+  const { decision: surface } = useSurfaceDecision();
+  const surfaceOn = surface === 'enabled';
+  // A phone gets a deliberately lighter scene, not a worse version of the big
+  // one: fewer segments, lower grid density, capped pixel ratio.
+  const isDesktop = useIsDesktop();
+  const [surfaceReady, setSurfaceReady] = useState(false);
 
   /** Entrance helper — one place, so timing stays consistent across sections. */
   const rise = (delay = 0) =>
@@ -318,8 +328,22 @@ export default function LandingPage({ onLoginSuccess }: Props) {
                   </span>
                 </div>
 
-                <div className="mt-6">
-                  <NetWorthChart animate={animate} />
+                {/* The 2D chart is the base layer and always renders, so the
+                    hero reads instantly and never shifts. When the surface is
+                    allowed and has painted, it fades in over the top and the
+                    chart fades out beneath it. */}
+                <div className="mt-6 relative h-[190px] sm:h-[210px]">
+                  <div
+                    className="absolute inset-0 flex items-center transition-opacity duration-700 ease-out"
+                    style={{ opacity: surfaceReady ? 0 : 1 }}
+                  >
+                    <NetWorthChart animate={animate} />
+                  </div>
+                  {surfaceOn && (
+                    <HeroVisual compact={!isDesktop} onReady={() => setSurfaceReady(true)} />
+                  )}
+                  {/* Keeps the figures legible over a moving surface. */}
+                  <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[var(--surface-1)] to-transparent pointer-events-none" />
                 </div>
 
                 <div className="mt-5 pt-5 border-t border-[var(--border-1)] grid grid-cols-3 gap-4">
@@ -668,3 +692,4 @@ export default function LandingPage({ onLoginSuccess }: Props) {
     </div>
   );
 }
+
