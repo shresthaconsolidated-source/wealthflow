@@ -11,6 +11,15 @@ import {
 import { motion, useReducedMotion } from 'motion/react';
 import { GoogleLogin } from '@react-oauth/google';
 import { cn } from '@/src/lib/utils';
+import {
+  MaskedLines,
+  CountUp,
+  StickyStack,
+  KineticStatement,
+  ScrollProgressBar,
+  SpringPress,
+  useParallax,
+} from '@/src/components/landing/motion-primitives';
 
 interface Props {
   onLoginSuccess: (credential: string) => void;
@@ -38,16 +47,36 @@ const NET_WORTH_SERIES = [
   38, 41, 39, 46, 52, 49, 58, 63, 61, 70, 76, 74, 83, 91, 97, 94, 104, 112,
 ];
 
-const CAPABILITIES = [
+const STACK = [
+  {
+    icon: Flame,
+    tone: 'text-[var(--gold)]',
+    barTone: 'bg-[var(--gold)]/25',
+    title: 'A real FIRE number',
+    body: 'Model the path to financial independence with inflation, raises and one-off events accounted for — not a back-of-napkin guess that ignores the messy parts.',
+    stat: '11.4',
+    statLabel: 'years to independence',
+    bars: [26, 34, 30, 42, 51, 47, 60, 68, 64, 79, 88, 100],
+  },
   {
     icon: TrendingUp,
+    tone: 'text-[var(--accent)]',
+    barTone: 'bg-[var(--accent)]/25',
     title: 'One net worth, everywhere',
-    body: 'Every account, asset and liability rolled into a single always-current figure — including the ones that only exist on paper.',
+    body: 'Every account, asset and liability rolled into a single always-current figure — including the ones that only exist on paper, and the ones you owe.',
+    stat: '12',
+    statLabel: 'accounts in one figure',
+    bars: [40, 52, 48, 61, 58, 70, 66, 78, 84, 80, 92, 97],
   },
   {
     icon: Activity,
+    tone: 'text-blue-400',
+    barTone: 'bg-blue-400/25',
     title: 'Spending that explains itself',
-    body: 'Recurring bills surface on their own. Trends arrive before you go looking for them.',
+    body: 'Recurring bills surface on their own. Trends arrive before you go looking for them, and one-off distortions stay out of your averages.',
+    stat: '41.3%',
+    statLabel: 'savings rate, trailing year',
+    bars: [55, 48, 62, 58, 71, 65, 74, 69, 82, 77, 88, 91],
   },
 ];
 
@@ -160,6 +189,9 @@ export default function LandingPage({ onLoginSuccess }: Props) {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const reduce = useReducedMotion();
   const animate = !reduce;
+  // The data panel drifts against the copy as the hero leaves — a depth cue,
+  // so the hero reads as two planes rather than one flat block.
+  const heroPanel = useParallax(34);
 
   /** Entrance helper — one place, so timing stays consistent across sections. */
   const rise = (delay = 0) =>
@@ -207,8 +239,9 @@ export default function LandingPage({ onLoginSuccess }: Props) {
             ))}
           </div>
 
-          <div className="shrink-0 rounded-full overflow-hidden">{signIn('signin_with')}</div>
+          <SpringPress className="shrink-0 rounded-full overflow-hidden">{signIn('signin_with')}</SpringPress>
         </div>
+        <ScrollProgressBar />
       </nav>
 
       {/* --------------------------------------------------------- hero */}
@@ -224,16 +257,15 @@ export default function LandingPage({ onLoginSuccess }: Props) {
                 <span className="text-[11px] font-medium text-[var(--text-secondary)] tracking-wide">Built for one — just you</span>
               </motion.div>
 
-              <motion.h1
-                {...(animate ? { initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 }, transition: { delay: 0.06, duration: 0.8, ease: EASE } } : {})}
-                className="mt-7 text-[2.5rem] leading-[1.07] sm:text-[3rem] lg:text-[3.4rem] font-semibold tracking-[-0.03em]"
-              >
-                Your whole financial life,
-                {/* Unconditional: keeps the accent phrase on its own line at
-                    every width, instead of starting mid-line on mobile. */}
-                <br />
-                <span className="text-[var(--accent)]">in one clear view.</span>
-              </motion.h1>
+              <h1 className="mt-7 text-[2.5rem] leading-[1.07] sm:text-[3rem] lg:text-[3.4rem] font-semibold tracking-[-0.03em]">
+                <MaskedLines
+                  delay={0.08}
+                  lines={[
+                    'Your whole financial life,',
+                    <span key="a" className="text-[var(--accent)]">in one clear view.</span>,
+                  ]}
+                />
+              </h1>
 
               <motion.p
                 {...(animate ? { initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 }, transition: { delay: 0.14, duration: 0.8, ease: EASE } } : {})}
@@ -246,7 +278,7 @@ export default function LandingPage({ onLoginSuccess }: Props) {
                 {...(animate ? { initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 }, transition: { delay: 0.22, duration: 0.8, ease: EASE } } : {})}
                 className="mt-9 flex items-center gap-4"
               >
-                <div className="rounded-full overflow-hidden">{signIn('continue_with')}</div>
+                <SpringPress className="rounded-full overflow-hidden">{signIn('continue_with')}</SpringPress>
               </motion.div>
             </div>
 
@@ -254,13 +286,17 @@ export default function LandingPage({ onLoginSuccess }: Props) {
             <motion.div
               {...(animate ? { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { delay: 0.18, duration: 0.9, ease: EASE } } : {})}
               className="lg:col-span-5"
+              ref={heroPanel.ref}
             >
-              <div className="rounded-2xl border border-[var(--border-1)] bg-[var(--surface-1)]/70 backdrop-blur-sm p-6 sm:p-7">
+              <motion.div
+                style={heroPanel.y ? { y: heroPanel.y } : undefined}
+                className="rounded-2xl border border-[var(--border-1)] bg-[var(--surface-1)]/70 backdrop-blur-sm p-6 sm:p-7"
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-[11px] text-[var(--text-tertiary)] tracking-wide">Net worth</p>
                     <p className="font-mono text-3xl sm:text-[2rem] font-semibold tracking-[-0.03em] mt-1.5 tabular-nums">
-                      $284,930
+                      <CountUp to={284930} prefix="$" />
                     </p>
                   </div>
                   <span className="shrink-0 mt-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] text-[12px] font-medium font-mono tabular-nums">
@@ -289,67 +325,92 @@ export default function LandingPage({ onLoginSuccess }: Props) {
                     </div>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
           </div>
         </div>
       </section>
 
       {/* -------------------------------------------------- capabilities */}
-      {/* Asymmetric: one lead capability carrying weight, two supporting.
-          Deliberately not three equal cards in a row. */}
-      <section id="capabilities" className="relative z-10 py-20 md:py-28 border-t border-[var(--border-1)]">
-        <div className="max-w-6xl mx-auto px-6">
+      {/* Sticky stack: the three capabilities pin in turn and the outgoing
+          card shrinks and dims behind the next. They are chapters of one
+          idea, read in order — not three options on a shelf. */}
+      <section id="capabilities" className="relative z-10 pt-20 md:pt-28 border-t border-[var(--border-1)]">
+        <div className="max-w-5xl mx-auto px-6">
           <motion.h2 {...rise()} className="text-3xl md:text-[2.6rem] font-semibold tracking-[-0.02em] max-w-[18ch] leading-[1.1]">
             Three things, done properly.
           </motion.h2>
+        </div>
 
-          <div className="mt-14 grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <motion.div {...rise(0.05)} className="lg:col-span-7 rounded-2xl border border-[var(--border-1)] bg-[var(--surface-1)]/60 p-8 md:p-10 flex flex-col">
-              <Flame className="w-6 h-6 text-[var(--gold)]" strokeWidth={1.75} />
-              <h3 className="mt-6 text-2xl font-semibold tracking-tight">A real FIRE number</h3>
-              <p className="mt-3 text-[15px] leading-relaxed text-[var(--text-secondary)] max-w-[52ch]">
-                Model the path to financial independence with inflation, raises and one-off events
-                accounted for — not a back-of-napkin guess that ignores the messy parts.
-              </p>
-
-              <div className="mt-auto pt-10 flex items-end gap-8">
-                <div>
-                  <p className="font-mono text-[2.75rem] leading-none font-semibold text-[var(--gold)] tabular-nums">11.4</p>
-                  <p className="text-[11px] text-[var(--text-tertiary)] mt-2">years to independence</p>
-                </div>
-                <div className="flex-1 flex items-end gap-1.5 h-16" aria-hidden="true">
-                  {[26, 34, 30, 42, 51, 47, 60, 68, 64, 79, 88, 100].map((v, i) => (
-                    <motion.span
-                      key={i}
-                      className="flex-1 rounded-sm bg-[var(--gold)]/25"
-                      style={{ height: `${v}%` }}
-                      {...(animate ? {
-                        initial: { scaleY: 0 },
-                        whileInView: { scaleY: 1 },
-                        viewport: { once: true },
-                        transition: { delay: 0.3 + i * 0.035, duration: 0.5, ease: EASE },
-                      } : {})}
-                    />
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-
-            <div className="lg:col-span-5 grid grid-cols-1 gap-6">
-              {CAPABILITIES.map((c, i) => (
+        <div className="max-w-5xl mx-auto px-6 mt-14 pb-[25vh]">
+          <StickyStack count={STACK.length}>
+            {(i, style) => {
+              const card = STACK[i];
+              return (
                 <motion.div
-                  key={c.title}
-                  {...rise(0.1 + i * 0.07)}
-                  className="rounded-2xl border border-[var(--border-1)] bg-[var(--surface-1)]/60 p-8 flex-1"
+                  style={style}
+                  className={cn(
+                    'origin-top rounded-2xl border p-8 md:p-12 flex flex-col justify-between',
+                    'min-h-[clamp(360px,52vh,480px)]',
+                    'bg-[var(--surface-1)] border-[var(--border-2)]',
+                    'shadow-[0_-8px_40px_-12px_rgba(0,0,0,0.65)]'
+                  )}
                 >
-                  <c.icon className="w-5 h-5 text-[var(--accent)]" strokeWidth={1.75} />
-                  <h3 className="mt-5 text-lg font-semibold tracking-tight">{c.title}</h3>
-                  <p className="mt-2.5 text-[14px] leading-relaxed text-[var(--text-secondary)]">{c.body}</p>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <card.icon className={cn('w-6 h-6', card.tone)} strokeWidth={1.75} />
+                      <span className="font-mono text-[11px] text-[var(--text-tertiary)] tabular-nums">
+                        {String(i + 1).padStart(2, '0')} / {String(STACK.length).padStart(2, '0')}
+                      </span>
+                    </div>
+                    <h3 className="mt-8 text-2xl md:text-[2rem] font-semibold tracking-[-0.02em] max-w-[16ch] leading-[1.15]">
+                      {card.title}
+                    </h3>
+                    <p className="mt-4 text-[15px] md:text-base leading-relaxed text-[var(--text-secondary)] max-w-[52ch]">
+                      {card.body}
+                    </p>
+                  </div>
+
+                  <div className="mt-10 flex items-end justify-between gap-8">
+                    <div>
+                      <p className={cn('font-mono text-[2.5rem] md:text-[3rem] leading-none font-semibold tabular-nums', card.tone)}>
+                        {card.stat}
+                      </p>
+                      <p className="text-[11px] text-[var(--text-tertiary)] mt-2.5">{card.statLabel}</p>
+                    </div>
+                    <div className="flex-1 flex items-end gap-1.5 h-16 max-w-[280px]" aria-hidden="true">
+                      {card.bars.map((v, bi) => (
+                        <motion.span
+                          key={bi}
+                          className={cn('flex-1 rounded-sm origin-bottom', card.barTone)}
+                          style={{ height: `${v}%` }}
+                          {...(animate ? {
+                            initial: { scaleY: 0 },
+                            whileInView: { scaleY: 1 },
+                            viewport: { once: true },
+                            transition: { delay: bi * 0.03, duration: 0.5, ease: EASE },
+                          } : {})}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </motion.div>
-              ))}
-            </div>
-          </div>
+              );
+            }}
+          </StickyStack>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------- kinetic statement */}
+      {/* The sentence is the content, so reading it is the interaction —
+          each word resolves as the reader moves down. */}
+      <section className="relative z-10 py-28 md:py-40 border-t border-[var(--border-1)]">
+        <div className="max-w-5xl mx-auto px-6">
+          <KineticStatement
+            words={['Every', 'account.', 'Every', 'asset.', 'One', 'honest', 'number.']}
+            accentFrom={4}
+            className="text-[2.4rem] sm:text-5xl md:text-[4.2rem] font-semibold tracking-[-0.035em] leading-[1.05] max-w-[16ch]"
+          />
         </div>
       </section>
 
@@ -393,7 +454,7 @@ export default function LandingPage({ onLoginSuccess }: Props) {
           <div className="mt-14 grid grid-cols-1 lg:grid-cols-12 gap-6">
             <motion.div {...rise(0.05)} className="lg:col-span-7 rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent-soft)]/40 p-8 md:p-10">
               <div className="flex items-baseline gap-3">
-                <span className="font-mono text-5xl font-semibold tabular-nums">$0</span>
+                <span className="font-mono text-5xl font-semibold tabular-nums"><CountUp to={0} prefix="$" /></span>
                 <span className="text-[var(--text-tertiary)] text-sm">forever</span>
               </div>
               <p className="mt-4 text-[15px] text-[var(--text-secondary)] max-w-[46ch]">
@@ -407,12 +468,12 @@ export default function LandingPage({ onLoginSuccess }: Props) {
                   </li>
                 ))}
               </ul>
-              <div className="mt-9 rounded-full overflow-hidden w-fit">{signIn('continue_with')}</div>
+              <SpringPress className="mt-9 rounded-full overflow-hidden w-fit">{signIn('continue_with')}</SpringPress>
             </motion.div>
 
             <motion.div {...rise(0.12)} className="lg:col-span-5 rounded-2xl border border-[var(--border-1)] p-8 md:p-10">
               <div className="flex items-baseline gap-3">
-                <span className="font-mono text-4xl font-semibold text-[var(--text-secondary)] tabular-nums">$20</span>
+                <span className="font-mono text-4xl font-semibold text-[var(--text-secondary)] tabular-nums"><CountUp to={20} prefix="$" /></span>
                 <span className="text-[var(--text-tertiary)] text-sm">/mo, later</span>
               </div>
               <p className="mt-4 text-[15px] text-[var(--text-tertiary)] max-w-[38ch]">
@@ -485,7 +546,7 @@ export default function LandingPage({ onLoginSuccess }: Props) {
             Sign in and add what you own. The rest of the picture builds itself.
           </motion.p>
           <motion.div {...rise(0.1)} className="mt-10 flex justify-center">
-            <div className="rounded-full overflow-hidden">{signIn('continue_with')}</div>
+            <SpringPress className="rounded-full overflow-hidden">{signIn('continue_with')}</SpringPress>
           </motion.div>
         </div>
       </section>
