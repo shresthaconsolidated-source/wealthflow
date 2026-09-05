@@ -1,3 +1,6 @@
 node_modules/
 dist/
 .env*
+
+# Local transaction backups taken by the importer — financial data, never commit
+backups/

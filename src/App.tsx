@@ -106,14 +106,14 @@ function AppInner() {
 
   if (isAdminView && user) {
     return (
-      <GoogleOAuthProvider clientId={clientId}>
+      <GoogleOAuthProvider clientId={clientId} locale="en">
         <AdminPulse onBack={() => toggleAdmin(false)} />
       </GoogleOAuthProvider>
     );
   }
 
   return (
-    <GoogleOAuthProvider clientId={clientId}>
+    <GoogleOAuthProvider clientId={clientId} locale="en">
       {loading ? (
         <div className="min-h-screen bg-[var(--surface-0)] flex items-center justify-center">
           <div className="w-10 h-10 border-[3px] border-[var(--accent-soft)] border-t-[var(--accent)] rounded-full animate-spin"></div>
